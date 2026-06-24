@@ -28,11 +28,47 @@ function mergeStores(remote) {
   const remoteTs = remote._ts || {};
   const allKeys = new Set([...Object.keys(localStore), ...Object.keys(remote)]);
 
+  const DEEP_KEYS = new Set(['ideas', 'fin:balance', 'fin:income']);
+
   allKeys.forEach(key => {
     if (key === '_ts') return;
     const lt = localTs[key] || 0;
     const rt = remoteTs[key] || 0;
-    if (rt > lt) {
+
+    if (DEEP_KEYS.has(key) && lt > 0 && rt > 0 && lt !== rt) {
+      const localArr = Array.isArray(localStore[key]) ? localStore[key] : [];
+      const remoteArr = Array.isArray(remote[key]) ? remote[key] : [];
+      const merged = new Map();
+
+      localArr.forEach(item => {
+        if (item && item.id != null) merged.set(String(item.id), item);
+      });
+      remoteArr.forEach(item => {
+        if (item && item.id != null) {
+          const id = String(item.id);
+          if (!merged.has(id)) {
+            merged.set(id, item);
+          } else if (key === 'ideas' && item.tasks) {
+            // Deep merge tasks within same idea by text
+            const localIdea = merged.get(id);
+            const remoteTasks = item.tasks;
+            const localTasks = localIdea.tasks || [];
+            const taskMap = new Map();
+            localTasks.forEach(t => { if (t && t.text) taskMap.set(t.text, t); });
+            remoteTasks.forEach(t => { if (t && t.text) taskMap.set(t.text, t); });
+            // Keep order: remote first, then local-only tasks appended
+            const mergedTasks = [];
+            const seen = new Set();
+            remoteTasks.forEach(t => { if (t && t.text && !seen.has(t.text)) { mergedTasks.push(t); seen.add(t.text); } });
+            localTasks.forEach(t => { if (t && t.text && !seen.has(t.text)) { mergedTasks.push(t); seen.add(t.text); } });
+            merged.set(id, { ...item, tasks: mergedTasks });
+          } else {
+            merged.set(id, item);
+          }
+        }
+      });
+      localStore[key] = Array.from(merged.values());
+    } else if (rt > lt) {
       localStore[key] = remote[key];
     }
   });
