@@ -14,75 +14,9 @@ if (typeof window.supabase !== 'undefined') {
 // ==================== STATE ====================
 let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
 let isSyncing = false;
-let lastSync = 0;
 let _saveTimer = null;
-let _lastSaveTs = 0;
 
-// ==================== MERGE SYNC ====================
-function touchKey(key) {
-  if (!localStore._ts) localStore._ts = {};
-  localStore._ts[key] = Date.now();
-}
-
-function mergeStores(remote) {
-  const localTs = localStore._ts || {};
-  const remoteTs = remote._ts || {};
-  const allKeys = new Set([...Object.keys(localStore), ...Object.keys(remote)]);
-
-  const DEEP_KEYS = new Set(['ideas', 'fin:balance', 'fin:income']);
-
-  allKeys.forEach(key => {
-    if (key === '_ts') return;
-    const lt = localTs[key] || 0;
-    const rt = remoteTs[key] || 0;
-
-    if (DEEP_KEYS.has(key) && lt > 0 && rt > 0 && lt !== rt) {
-      const localArr = Array.isArray(localStore[key]) ? localStore[key] : [];
-      const remoteArr = Array.isArray(remote[key]) ? remote[key] : [];
-      const merged = new Map();
-
-      localArr.forEach(item => {
-        if (item && item.id != null) merged.set(String(item.id), item);
-      });
-      remoteArr.forEach(item => {
-        if (item && item.id != null) {
-          const id = String(item.id);
-          if (!merged.has(id)) {
-            merged.set(id, item);
-          } else if (key === 'ideas' && item.tasks) {
-            // Deep merge tasks within same idea by text
-            const localIdea = merged.get(id);
-            const remoteTasks = item.tasks;
-            const localTasks = localIdea.tasks || [];
-            const taskMap = new Map();
-            localTasks.forEach(t => { if (t && t.text) taskMap.set(t.text, t); });
-            remoteTasks.forEach(t => { if (t && t.text) taskMap.set(t.text, t); });
-            // Keep order: remote first, then local-only tasks appended
-            const mergedTasks = [];
-            const seen = new Set();
-            remoteTasks.forEach(t => { if (t && t.text && !seen.has(t.text)) { mergedTasks.push(t); seen.add(t.text); } });
-            localTasks.forEach(t => { if (t && t.text && !seen.has(t.text)) { mergedTasks.push(t); seen.add(t.text); } });
-            merged.set(id, { ...item, tasks: mergedTasks });
-          } else {
-            merged.set(id, item);
-          }
-        }
-      });
-      localStore[key] = Array.from(merged.values());
-    } else if (rt > lt) {
-      localStore[key] = remote[key];
-    }
-  });
-
-  if (!localStore._ts) localStore._ts = {};
-  allKeys.forEach(key => {
-    if (key === '_ts') return;
-    const lt = localTs[key] || 0;
-    const rt = remoteTs[key] || 0;
-    localStore._ts[key] = Math.max(lt, rt);
-  });
-}
-
+// ==================== SYNC ====================
 function showSyncStatus(text, type = 'syncing') {
   const status = document.getElementById('syncStatus');
   const textEl = document.getElementById('syncText');
@@ -95,7 +29,6 @@ function showSyncStatus(text, type = 'syncing') {
   }
 }
 
-// Синхронизация В СУПЕЙБАЗ
 async function syncToSupabase() {
   if (!supabaseClient || isSyncing) return;
 
@@ -103,25 +36,17 @@ async function syncToSupabase() {
   showSyncStatus('Синхронизация...');
 
   try {
-    const savedAt = Date.now();
-    const snapshot = JSON.parse(JSON.stringify(localStore));
     const { error } = await supabaseClient
       .from('app_state')
       .upsert({
         key: 'planner_data',
-        data: snapshot,
+        data: localStore,
         updated_at: new Date().toISOString()
       }, { onConflict: 'key' });
 
     if (error) throw error;
 
-    lastSync = Date.now();
     showSyncStatus('Синхронизировано', 'success');
-
-    // If changes happened during sync, schedule another
-    if (_lastSaveTs > savedAt) {
-      _saveTimer = setTimeout(() => syncToSupabase(), 300);
-    }
   } catch (err) {
     console.error('Sync error:', err);
     showSyncStatus('Ошибка: ' + err.message, 'error');
@@ -130,7 +55,6 @@ async function syncToSupabase() {
   }
 }
 
-// Загрузка ИЗ СУПЕЙБАЗА
 async function loadFromSupabase() {
   if (!supabaseClient) {
     console.log('Working in local mode');
@@ -147,7 +71,7 @@ async function loadFromSupabase() {
     if (error && error.code !== 'PGRST116') throw error;
 
     if (data && data.data) {
-      mergeStores(data.data);
+      localStore = data.data;
       localStorage.setItem('plannerV2', JSON.stringify(localStore));
       showSyncStatus('Данные загружены', 'success');
     }
@@ -158,32 +82,11 @@ async function loadFromSupabase() {
 
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
-  _lastSaveTs = Date.now();
-  if (!supabaseClient) return;
   if (_saveTimer) clearTimeout(_saveTimer);
-  if (isSyncing) return;
-  if (Date.now() - lastSync > 3000) {
-    // First save after idle — sync immediately
-    syncToSupabase();
-  } else {
-    // Rapid saves — debounce
+  if (supabaseClient) {
     _saveTimer = setTimeout(() => syncToSupabase(), 300);
   }
 }
-
-// Force sync on page hide — covers tab switch, app background, page close
-window.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && supabaseClient && _lastSaveTs > lastSync) {
-    syncToSupabase();
-  }
-});
-
-// Backup: beforeunload for direct tab close
-window.addEventListener('beforeunload', () => {
-  if (supabaseClient && _lastSaveTs > lastSync) {
-    syncToSupabase();
-  }
-});
 
 // ==================== CONSTANTS & HELPERS ====================
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -304,7 +207,6 @@ function setMood(y, m, d, val) {
 function saveDayData(y, m, d, data) {
   const k = `day:${y}-${m}-${d}`;
   localStore[k] = data;
-  touchKey(k);
   save();
 }
 
@@ -317,7 +219,6 @@ function getMonthData(y, m) {
 function saveMonthData(y, m, data) {
   const k = `month:${y}-${m}`;
   localStore[k] = data;
-  touchKey(k);
   save();
 }
 
@@ -330,18 +231,17 @@ function getWater() {
 function saveWater(v) {
   const k = `water:${activeDateStr()}`;
   localStore[k] = v;
-  touchKey(k);
   save();
 }
 
 function getFinBalance() { return localStore['fin:balance'] || []; }
-function saveFinBalance(v) { localStore['fin:balance'] = v; touchKey('fin:balance'); save(); }
+function saveFinBalance(v) { localStore['fin:balance'] = v; save(); }
 
 function getFinIncome() { return localStore['fin:income'] || []; }
-function saveFinIncome(v) { localStore['fin:income'] = v; touchKey('fin:income'); save(); }
+function saveFinIncome(v) { localStore['fin:income'] = v; save(); }
 
 function getWishlist() { return localStore['wishlist'] || []; }
-function saveWishlist(v) { localStore['wishlist'] = v; touchKey('wishlist'); save(); }
+function saveWishlist(v) { localStore['wishlist'] = v; save(); }
 
 // ==================== ROLLOVER ====================
 function doRollover() {
@@ -361,7 +261,6 @@ function doRollover() {
     }
     prev._rolledOver = rollKey;
     localStore[yk] = prev;
-    touchKey(yk);
     save();
   }
 }
@@ -401,8 +300,6 @@ function addXP(amount, reason, actionKey) {
   const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${cutoff.getDate()}`;
   Object.keys(localStore._xpLog).forEach(k => { if (k < cutoffKey) delete localStore._xpLog[k]; });
 
-  touchKey('_xp');
-  touchKey('_xpLog');
   save();
   showXPToast(amount);
   return true;
@@ -442,7 +339,6 @@ function getSleep(y, m, d) {
 
 function saveSleep(y, m, d, data) {
   localStore[`sleep:${y}-${m}-${d}`] = data;
-  touchKey(`sleep:${y}-${m}-${d}`);
   if (data.bed && data.wake) addXP(XP_PER_SLEEP, 'Сон', `sleep-${y}-${m}-${d}`);
   save();
 }
@@ -529,7 +425,6 @@ function getIdeas() {
 
 function saveIdeas(v) {
   localStore['ideas'] = v;
-  touchKey('ideas');
   save();
 }
 
