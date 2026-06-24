@@ -416,12 +416,11 @@ function bindEvents() {
 // ==================== INIT ====================
 async function init() {
   console.log('🚀 Initializing...');
+  await loadFromSupabase();
   doRollover();
   initScrollTop();
   initTouchDrag();
-  render();
   startPeriodicSync();
-  await loadFromServer();
   render();
 }
 
