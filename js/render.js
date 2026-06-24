@@ -431,7 +431,12 @@ function startSyncPolling() {
 
 async function init() {
   console.log('🚀 Initializing...');
-  await loadFromSupabase();
+  try {
+    await loadFromSupabase();
+  } catch (e) {
+    console.error('Failed to load from Supabase:', e);
+    showSyncStatus('Ошибка загрузки', 'error');
+  }
   doRollover();
   initScrollTop();
   initTouchDrag();

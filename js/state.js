@@ -15,6 +15,7 @@ if (typeof window.supabase !== 'undefined') {
 let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
 let isSyncing = false;
 let _saveTimer = null;
+let _loaded = false; // Only sync AFTER initial load
 
 // ==================== SYNC ====================
 function showSyncStatus(text, type = 'syncing') {
@@ -30,7 +31,7 @@ function showSyncStatus(text, type = 'syncing') {
 }
 
 async function syncToSupabase() {
-  if (!supabaseClient || isSyncing) return;
+  if (!supabaseClient || isSyncing || !_loaded) return;
 
   isSyncing = true;
   showSyncStatus('Синхронизация...');
@@ -57,6 +58,8 @@ async function syncToSupabase() {
 
 async function loadFromSupabase() {
   if (!supabaseClient) {
+    localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
+    _loaded = true;
     console.log('Working in local mode');
     return;
   }
@@ -75,8 +78,12 @@ async function loadFromSupabase() {
       localStorage.setItem('plannerV2', JSON.stringify(localStore));
       showSyncStatus('Данные загружены', 'success');
     }
+    _loaded = true;
   } catch (err) {
     console.error('Load error:', err);
+    localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
+    _loaded = true;
+    showSyncStatus('Оффлайн режим', 'error');
   }
 }
 
