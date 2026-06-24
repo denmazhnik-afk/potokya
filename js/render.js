@@ -414,6 +414,17 @@ function bindEvents() {
 }
 
 // ==================== INIT ====================
+let _syncInterval = null;
+
+function startSyncPolling() {
+  if (_syncInterval) clearInterval(_syncInterval);
+  _syncInterval = setInterval(() => {
+    if (supabaseClient && !isSyncing) {
+      loadFromSupabase().then(() => {});
+    }
+  }, 60000);
+}
+
 async function init() {
   console.log('🚀 Initializing...');
   await loadFromSupabase();
@@ -421,6 +432,7 @@ async function init() {
   initScrollTop();
   initTouchDrag();
   render();
+  startSyncPolling();
 }
 
 if (document.readyState === 'loading') {
