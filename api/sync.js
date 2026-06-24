@@ -27,7 +27,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { data } = req.body;
+      // Read body manually for reliability
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const { data } = JSON.parse(body);
+
       const url = `${SUPABASE_URL}/rest/v1/${TABLE}`;
       const r = await fetch(url, {
         method: 'POST',
