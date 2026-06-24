@@ -22,6 +22,34 @@ let _saveTimer = null;
 let _loaded = false; // Only sync AFTER initial load
 
 // ==================== SYNC ====================
+function touchKey(key) {
+  if (!localStore._ts) localStore._ts = {};
+  localStore._ts[key] = Date.now();
+}
+
+function mergeStores(remote) {
+  const localTs = localStore._ts || {};
+  const remoteTs = remote._ts || {};
+  const allKeys = new Set([...Object.keys(localStore), ...Object.keys(remote)]);
+
+  allKeys.forEach(key => {
+    if (key === '_ts') return;
+    const lt = localTs[key] || 0;
+    const rt = remoteTs[key] || 0;
+    if (rt > lt) {
+      localStore[key] = remote[key];
+    }
+  });
+
+  if (!localStore._ts) localStore._ts = {};
+  allKeys.forEach(key => {
+    if (key === '_ts') return;
+    const lt = localTs[key] || 0;
+    const rt = remoteTs[key] || 0;
+    localStore._ts[key] = Math.max(lt, rt);
+  });
+}
+
 function showSyncStatus(text, type = 'syncing') {
   const status = document.getElementById('syncStatus');
   const textEl = document.getElementById('syncText');
@@ -78,7 +106,7 @@ async function loadFromSupabase() {
     if (error && error.code !== 'PGRST116') throw error;
 
     if (data && data.data) {
-      localStore = data.data;
+      mergeStores(data.data);
       localStorage.setItem('plannerV2', JSON.stringify(localStore));
       showSyncStatus('Данные загружены', 'success');
     }
@@ -218,6 +246,7 @@ function setMood(y, m, d, val) {
 function saveDayData(y, m, d, data) {
   const k = `day:${y}-${m}-${d}`;
   localStore[k] = data;
+  touchKey(k);
   save();
 }
 
@@ -230,6 +259,7 @@ function getMonthData(y, m) {
 function saveMonthData(y, m, data) {
   const k = `month:${y}-${m}`;
   localStore[k] = data;
+  touchKey(k);
   save();
 }
 
@@ -242,17 +272,18 @@ function getWater() {
 function saveWater(v) {
   const k = `water:${activeDateStr()}`;
   localStore[k] = v;
+  touchKey(k);
   save();
 }
 
 function getFinBalance() { return localStore['fin:balance'] || []; }
-function saveFinBalance(v) { localStore['fin:balance'] = v; save(); }
+function saveFinBalance(v) { localStore['fin:balance'] = v; touchKey('fin:balance'); save(); }
 
 function getFinIncome() { return localStore['fin:income'] || []; }
-function saveFinIncome(v) { localStore['fin:income'] = v; save(); }
+function saveFinIncome(v) { localStore['fin:income'] = v; touchKey('fin:income'); save(); }
 
 function getWishlist() { return localStore['wishlist'] || []; }
-function saveWishlist(v) { localStore['wishlist'] = v; save(); }
+function saveWishlist(v) { localStore['wishlist'] = v; touchKey('wishlist'); save(); }
 
 // ==================== ROLLOVER ====================
 function doRollover() {
@@ -272,6 +303,8 @@ function doRollover() {
     }
     prev._rolledOver = rollKey;
     localStore[yk] = prev;
+    touchKey(yk);
+    touchKey(`day:${ACT_Y}-${ACT_M}-${ACT_D}`);
     save();
   }
 }
@@ -311,6 +344,8 @@ function addXP(amount, reason, actionKey) {
   const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${cutoff.getDate()}`;
   Object.keys(localStore._xpLog).forEach(k => { if (k < cutoffKey) delete localStore._xpLog[k]; });
 
+  touchKey('_xp');
+  touchKey('_xpLog');
   save();
   showXPToast(amount);
   return true;
@@ -349,7 +384,9 @@ function getSleep(y, m, d) {
 }
 
 function saveSleep(y, m, d, data) {
-  localStore[`sleep:${y}-${m}-${d}`] = data;
+  const k = `sleep:${y}-${m}-${d}`;
+  localStore[k] = data;
+  touchKey(k);
   if (data.bed && data.wake) addXP(XP_PER_SLEEP, 'Сон', `sleep-${y}-${m}-${d}`);
   save();
 }
@@ -436,6 +473,7 @@ function getIdeas() {
 
 function saveIdeas(v) {
   localStore['ideas'] = v;
+  touchKey('ideas');
   save();
 }
 
