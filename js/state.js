@@ -103,11 +103,13 @@ async function syncToSupabase() {
   showSyncStatus('Синхронизация...');
 
   try {
+    const savedAt = Date.now();
+    const snapshot = JSON.parse(JSON.stringify(localStore));
     const { error } = await supabaseClient
       .from('app_state')
       .upsert({
         key: 'planner_data',
-        data: localStore,
+        data: snapshot,
         updated_at: new Date().toISOString()
       }, { onConflict: 'key' });
 
@@ -115,6 +117,11 @@ async function syncToSupabase() {
 
     lastSync = Date.now();
     showSyncStatus('Синхронизировано', 'success');
+
+    // If changes happened during sync, schedule another
+    if (_lastSaveTs > savedAt) {
+      _saveTimer = setTimeout(() => syncToSupabase(), 300);
+    }
   } catch (err) {
     console.error('Sync error:', err);
     showSyncStatus('Ошибка: ' + err.message, 'error');
@@ -152,15 +159,28 @@ async function loadFromSupabase() {
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
   _lastSaveTs = Date.now();
+  if (!supabaseClient) return;
   if (_saveTimer) clearTimeout(_saveTimer);
-  if (supabaseClient && Date.now() - lastSync > 2000) {
-    _saveTimer = setTimeout(() => syncToSupabase(), 200);
+  if (isSyncing) return;
+  if (Date.now() - lastSync > 3000) {
+    // First save after idle — sync immediately
+    syncToSupabase();
+  } else {
+    // Rapid saves — debounce
+    _saveTimer = setTimeout(() => syncToSupabase(), 300);
   }
 }
 
 // Force sync on page hide — covers tab switch, app background, page close
 window.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && supabaseClient && _lastSaveTs > lastSync) {
+    syncToSupabase();
+  }
+});
+
+// Backup: beforeunload for direct tab close
+window.addEventListener('beforeunload', () => {
+  if (supabaseClient && _lastSaveTs > lastSync) {
     syncToSupabase();
   }
 });
