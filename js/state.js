@@ -16,6 +16,7 @@ let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
 let isSyncing = false;
 let lastSync = 0;
 let _saveTimer = null;
+let _lastSaveTs = 0;
 
 // ==================== MERGE SYNC ====================
 function touchKey(key) {
@@ -150,16 +151,16 @@ async function loadFromSupabase() {
 
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
+  _lastSaveTs = Date.now();
   if (_saveTimer) clearTimeout(_saveTimer);
   if (supabaseClient && Date.now() - lastSync > 2000) {
     _saveTimer = setTimeout(() => syncToSupabase(), 200);
   }
 }
 
-// Force sync on page close — use sendBeacon with supabase REST
+// Force sync on page hide — covers tab switch, app background, page close
 window.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && supabaseClient && Date.now() - lastSync > 2000) {
-    // Fire and forget — supabase client uses fetch internally
+  if (document.visibilityState === 'hidden' && supabaseClient && _lastSaveTs > lastSync) {
     syncToSupabase();
   }
 });
