@@ -1,18 +1,5 @@
-// ==================== SUPABASE SETUP ====================
-let supabaseClient = null;
-
-if (typeof window.supabase !== 'undefined') {
-  supabaseClient = window.supabase.createClient(
-    'https://qgmzuhprvbdwjgtwajei.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnbXp1aHBydmJkd2pndHdhamVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMzQ5NDcsImV4cCI6MjA5NzgxMDk0N30.lZ_qaVEZ1UR4btb2VvgD60sGH39fa10hj2iCB9wFo8I'
-  );
-  console.log('✅ Supabase client created');
-} else {
-  console.warn('❌ Supabase library not loaded');
-}
-
-// ==================== STATE ====================
-let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
+// ==================== SYNC (via Vercel proxy) ====================
+const SYNC_URL = '/api/sync';
 let isSyncing = false;
 let lastSync = 0;
 
@@ -28,78 +15,62 @@ function showSyncStatus(text, type = 'syncing') {
   }
 }
 
-// Синхронизация В СУПЕЙБАЗ
-async function syncToSupabase() {
-  if (!supabaseClient || isSyncing) return;
-
+async function syncToServer() {
+  if (isSyncing) return;
   isSyncing = true;
   showSyncStatus('Синхронизация...');
 
   try {
-    const { error } = await supabaseClient
-      .from('app_state')
-      .upsert({
-        key: 'planner_data',
-        data: localStore,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'key' });
-
-    if (error) throw error;
-
+    const r = await fetch(SYNC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: localStore })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     lastSync = Date.now();
     showSyncStatus('Синхронизировано', 'success');
   } catch (err) {
     console.error('Sync error:', err);
-    showSyncStatus('Ошибка: ' + err.message, 'error');
+    showSyncStatus('Ошибка синхронизации', 'error');
   } finally {
     isSyncing = false;
   }
 }
 
-// Загрузка ИЗ СУПЕЙБАЗА
-async function loadFromSupabase() {
-  if (!supabaseClient) {
-    console.log('Working in local mode');
-    return;
-  }
-
+async function loadFromServer() {
   try {
-    const { data, error } = await supabaseClient
-      .from('app_state')
-      .select('data')
-      .eq('key', 'planner_data')
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-
-    if (data && data.data) {
-      localStore = data.data;
+    const r = await fetch(SYNC_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const json = await r.json();
+    if (json && json.data) {
+      localStore = json.data;
       localStorage.setItem('plannerV2', JSON.stringify(localStore));
       showSyncStatus('Данные загружены', 'success');
     }
   } catch (err) {
-    console.error('Load error:', err);
+    console.log('Server sync unavailable, using local data');
   }
 }
 
+// ==================== STATE ====================
+let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
+
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
-  if (supabaseClient && Date.now() - lastSync > 2000) {
-    setTimeout(() => syncToSupabase(), 500);
+  if (Date.now() - lastSync > 2000) {
+    setTimeout(() => syncToServer(), 500);
   }
 }
 
 // ==================== PERIODIC SYNC ====================
 function startPeriodicSync() {
-  // Push to Supabase every 30s if there were local changes
   setInterval(() => {
-    if (supabaseClient && !isSyncing) syncToSupabase();
+    if (!isSyncing) syncToServer();
   }, 30000);
 
-  // Pull from Supabase when user returns to tab
   document.addEventListener('visibilitychange', async () => {
-    if (!document.hidden && supabaseClient) {
-      await loadFromSupabase();
+    if (!document.hidden) {
+      await loadFromServer();
       render();
     }
   });
@@ -107,7 +78,7 @@ function startPeriodicSync() {
 
 // ==================== CONSTANTS & HELPERS ====================
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-const MONTHS_SHORT = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const MONTHS_SHORT = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Сен','Окт','Ноя','Дек'];
 const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const WEEKDAYS_FULL = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
 
