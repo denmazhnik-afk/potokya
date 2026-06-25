@@ -124,6 +124,7 @@ function buildIdeaDetail() {
       <div class="add-row">
         <input class="add-input" id="ideaTaskInp" placeholder="Новая задача..." autofocus>
         <input class="add-input deadline-input" id="ideaTaskDateInp" type="date" title="Дата (необязательно)">
+        <input class="add-input deadline-input" id="ideaTaskTimeInp" type="time" title="Время (необязательно)">
         <button class="btn-primary" onclick="addIdeaTask('${esc(idea.id)}')">+</button>
       </div>
     </div>
@@ -204,9 +205,11 @@ function sortIdeaTasks(tasks) {
 function addIdeaTask(id) {
   const inp = document.getElementById('ideaTaskInp');
   const dateInp = document.getElementById('ideaTaskDateInp');
+  const timeInp = document.getElementById('ideaTaskTimeInp');
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
   const date = dateInp ? dateInp.value : '';
+  const time = timeInp ? timeInp.value : '';
 
   const ideas = getIdeas();
   const idea = ideas.find(p => p.id === id);
@@ -214,7 +217,8 @@ function addIdeaTask(id) {
     idea.tasks.push({
       id: generateIdeaTaskId(),
       text, done: false,
-      scheduledDate: date || null
+      scheduledDate: date || null,
+      scheduledTime: time || null
     });
     sortIdeaTasks(idea.tasks);
     saveIdeas(ideas);
@@ -257,12 +261,73 @@ function setIdeaTaskDate(ideaId, taskIdx) {
   const idea = ideas.find(p => p.id === ideaId);
   if (!idea || !idea.tasks[taskIdx]) return;
   const task = idea.tasks[taskIdx];
-  const newDate = prompt('Дата (ГГГГ-ММ-ДД):', task.scheduledDate || '');
-  if (newDate !== null) {
-    task.scheduledDate = newDate || null;
+
+  // Remove old modal if exists
+  const old = document.getElementById('dateModal');
+  if (old) old.remove();
+
+  // Parse existing date and time
+  let dateVal = task.scheduledDate || '';
+  let timeVal = task.scheduledTime || '';
+
+  const modal = document.createElement('div');
+  modal.id = 'dateModal';
+  modal.className = 'date-modal-overlay';
+  modal.innerHTML = `
+    <div class="date-modal">
+      <div class="date-modal-title">${esc(task.text)}</div>
+      <div class="date-modal-row">
+        <div class="date-modal-field">
+          <label class="date-modal-label">Дата</label>
+          <input class="date-modal-input" id="dateModalInput" type="date" value="${dateVal}">
+        </div>
+        <div class="date-modal-field">
+          <label class="date-modal-label">Время</label>
+          <input class="date-modal-input" id="dateModalTime" type="time" value="${timeVal}">
+        </div>
+      </div>
+      <div class="date-modal-actions">
+        <button class="date-modal-btn save" onclick="confirmSetIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✓ Сохранить</button>
+        <button class="date-modal-btn remove" onclick="clearIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✕ Убрать</button>
+        <button class="date-modal-btn cancel" onclick="cancelSetIdeaTaskDate()">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) cancelSetIdeaTaskDate(); });
+}
+
+function confirmSetIdeaTaskDate(ideaId, taskIdx) {
+  const dateInp = document.getElementById('dateModalInput');
+  const timeInp = document.getElementById('dateModalTime');
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (idea && idea.tasks[taskIdx]) {
+    idea.tasks[taskIdx].scheduledDate = (dateInp && dateInp.value) || null;
+    idea.tasks[taskIdx].scheduledTime = (timeInp && timeInp.value) || null;
     saveIdeas(ideas);
-    render();
   }
+  const modal = document.getElementById('dateModal');
+  if (modal) modal.remove();
+  render();
+}
+
+function clearIdeaTaskDate(ideaId, taskIdx) {
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (idea && idea.tasks[taskIdx]) {
+    idea.tasks[taskIdx].scheduledDate = null;
+    idea.tasks[taskIdx].scheduledTime = null;
+    saveIdeas(ideas);
+  }
+  const modal = document.getElementById('dateModal');
+  if (modal) modal.remove();
+  render();
+}
+
+function cancelSetIdeaTaskDate() {
+  const modal = document.getElementById('dateModal');
+  if (modal) modal.remove();
 }
 
 // ==================== IDEA DONE TOGGLE ====================

@@ -554,6 +554,89 @@
   background: #ef4444;
 }
 
+/* ====== DATE MODAL ====== */
+.date-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.date-modal {
+  background: rgba(18,18,28,0.96);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  backdrop-filter: blur(24px);
+}
+
+.date-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date-modal-input {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px;
+  font-family: var(--mono);
+  margin-bottom: 16px;
+}
+
+.date-modal-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.date-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-modal-btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.date-modal-btn.save {
+  background: var(--green);
+  color: #000;
+}
+
+.date-modal-btn.remove {
+  background: rgba(255,255,255,0.06);
+  color: var(--red);
+  border: 1px solid rgba(255,77,77,0.3);
+}
+
+.date-modal-btn.cancel {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-tertiary);
+}
+
 /* ====== SLEEP SECTION ====== */
 .sleep-form {
   display: flex;
