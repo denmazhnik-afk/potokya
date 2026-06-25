@@ -1,5 +1,6 @@
 // ==================== DAY PAGE ====================
 function buildDayPage() {
+  const td = getDayData(ACT_Y, ACT_M, ACT_D);
   const allTasks = getDayTasksWithIdeas(ACT_Y, ACT_M, ACT_D);
   window._currentDayTasks = allTasks;
   const total = allTasks.length;
@@ -60,7 +61,7 @@ function buildDayPage() {
       </div>`;
 
   let pushBtn = '';
-  if (td.tasks.some(t => !t.done)) {
+  if (allTasks.some(t => !t.done)) {
     pushBtn = `<button class="btn-push" onclick="pushTomorrow()">↪ Перенести невыполненное на завтра</button>`;
   }
 
