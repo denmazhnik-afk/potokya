@@ -532,6 +532,13 @@
   background: rgba(255,255,255,0.05);
 }
 
+.idea-tag {
+  font-size: 12px;
+  margin-right: 4px;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
 .deadline-input {
   max-width: 150px;
   font-size: 12px !important;

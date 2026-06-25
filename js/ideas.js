@@ -25,6 +25,7 @@ function buildIdeasPage() {
 
   return `
     <div class="page-header">
+      <button class="back-btn" onclick="goHome()">← Назад</button>
       <h2 class="page-heading">💡 База идей</h2>
       <button class="btn-primary" onclick="startAddIdea()">+ Проект</button>
     </div>
@@ -56,6 +57,7 @@ function buildIdeaDetail() {
     const isUrgent = t.urgent && !t.done;
     const urgentCls = isUrgent ? 'urgent-row' : '';
     const urgentBtn = isUrgent ? 'active' : '';
+    const dateBadge = t.scheduledDate ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.scheduledDate}</span>` : '';
     const itemHTML = `
       <div class="task-item ${t.done ? 'done-row' : ''} ${urgentCls}"
         draggable="true" data-idx="${i}" data-flip-id="idea-${esc(idea.id)}-${i}"
@@ -66,7 +68,9 @@ function buildIdeaDetail() {
         <span class="task-drag" title="Перетащить">⋮⋮</span>
         <div class="task-cb ${t.done ? 'checked' : ''}" onclick="toggleIdeaTask('${esc(idea.id)}',${i})"></div>
         <span class="task-name ${t.done ? 'struck' : ''}">${esc(t.text)}</span>
+        ${dateBadge}
         ${t.done ? '' : `<button class="task-urgent-btn ${urgentBtn}" onclick="toggleIdeaTaskUrgent('${esc(idea.id)}',${i})" title="Срочно">⚡</button>`}
+        <button class="ibtn" onclick="setIdeaTaskDate('${esc(idea.id)}',${i})" title="Дата">📅</button>
         <button class="task-del" onclick="deleteIdeaTask('${esc(idea.id)}',${i})">×</button>
       </div>
     `;
@@ -119,6 +123,7 @@ function buildIdeaDetail() {
       </div>
       <div class="add-row">
         <input class="add-input" id="ideaTaskInp" placeholder="Новая задача..." autofocus>
+        <input class="add-input deadline-input" id="ideaTaskDateInp" type="date" title="Дата (необязательно)">
         <button class="btn-primary" onclick="addIdeaTask('${esc(idea.id)}')">+</button>
       </div>
     </div>
@@ -198,13 +203,19 @@ function sortIdeaTasks(tasks) {
 
 function addIdeaTask(id) {
   const inp = document.getElementById('ideaTaskInp');
+  const dateInp = document.getElementById('ideaTaskDateInp');
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
+  const date = dateInp ? dateInp.value : '';
 
   const ideas = getIdeas();
   const idea = ideas.find(p => p.id === id);
   if (idea) {
-    idea.tasks.push({ text, done: false });
+    idea.tasks.push({
+      id: generateIdeaTaskId(),
+      text, done: false,
+      scheduledDate: date || null
+    });
     sortIdeaTasks(idea.tasks);
     saveIdeas(ideas);
     render();
@@ -214,12 +225,10 @@ function addIdeaTask(id) {
 function toggleIdeaTask(id, idx) {
   const ideas = getIdeas();
   const idea = ideas.find(p => p.id === id);
-  if (idea && idea.tasks[idx]) {
-    idea.tasks[idx].done = !idea.tasks[idx].done;
-    sortIdeaTasks(idea.tasks);
-    saveIdeas(ideas);
-    render();
-  }
+  if (!idea || !idea.tasks[idx]) return;
+  idea.tasks[idx].done = !idea.tasks[idx].done;
+  saveIdeas(ideas);
+  render();
 }
 
 function toggleIdeaTaskUrgent(id, idx) {
@@ -238,6 +247,19 @@ function deleteIdeaTask(id, idx) {
   const idea = ideas.find(p => p.id === id);
   if (idea) {
     idea.tasks.splice(idx, 1);
+    saveIdeas(ideas);
+    render();
+  }
+}
+
+function setIdeaTaskDate(ideaId, taskIdx) {
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (!idea || !idea.tasks[taskIdx]) return;
+  const task = idea.tasks[taskIdx];
+  const newDate = prompt('Дата (ГГГГ-ММ-ДД):', task.scheduledDate || '');
+  if (newDate !== null) {
+    task.scheduledDate = newDate || null;
     saveIdeas(ideas);
     render();
   }

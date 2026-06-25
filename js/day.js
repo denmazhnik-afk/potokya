@@ -1,30 +1,32 @@
 // ==================== DAY PAGE ====================
 function buildDayPage() {
-  const td = getDayData(ACT_Y, ACT_M, ACT_D);
-  const total = td.tasks.length;
-  const done = td.tasks.filter(t => t.done).length;
+  const allTasks = getDayTasksWithIdeas(ACT_Y, ACT_M, ACT_D);
+  window._currentDayTasks = allTasks;
+  const total = allTasks.length;
+  const done = allTasks.filter(t => t.done).length;
   const pct = total > 0 ? Math.round(done/total*100) : 0;
   const water = getWater();
 
-  const items = buildTickerItems(td.tasks);
+  const items = buildTickerItems(allTasks);
 
   let tasksHTML = '';
-  td.tasks.forEach((t, i) => {
+  allTasks.forEach((t, i) => {
     const hasDeadline = t.deadline && !t.done;
     const isUrgent = t.urgent && !t.done;
     const dlBadge = t.deadline ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.deadline}</span>` : '';
     const urgentCls = isUrgent ? 'urgent-row' : '';
     const urgentBtn = isUrgent ? 'active' : '';
+    const ideaTag = t.fromIdea ? `<span class="idea-tag" title="Из проекта">${esc(t.ideaEmoji || '📁')}</span>` : '';
     tasksHTML += `<li class="task-item ${t.done ? 'done-row' : ''} ${hasDeadline ? 'deadline-row' : ''} ${urgentCls}"
       draggable="true" data-idx="${i}" data-flip-id="dt-${flipKey(t.text)}"
       ondragstart="dayDragStart(event,${i})" ondragover="dayDragOver(event)"
       ondrop="dayDrop(event,${i})" ondragend="dayDragEnd(event)">
       <span class="task-drag" title="Перетащить">⋮⋮</span>
       <div class="task-cb ${t.done ? 'checked' : ''}" onclick="toggleDayTask(${i})"></div>
-      <span class="task-name ${t.done ? 'struck' : ''}">${esc(t.text)}</span>
+      <span class="task-name ${t.done ? 'struck' : ''}">${ideaTag}${esc(t.text)}</span>
       ${dlBadge}
       <button class="task-urgent-btn ${urgentBtn}" onclick="toggleDayTaskUrgent(${i})" title="Срочно">⚡</button>
-      <button class="task-del" onclick="deleteDayTask(${i})">×</button>
+      <button class="task-del" onclick="deleteDayTask(${i})" title="${t.fromIdea ? 'Убрать из дня' : 'Удалить'}">×</button>
     </li>`;
   });
   if (!tasksHTML) tasksHTML = `<li class="empty-state">Нет задач — добавьте первую</li>`;

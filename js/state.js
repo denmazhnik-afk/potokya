@@ -245,7 +245,11 @@ function doRollover() {
       const td = getDayData(ACT_Y, ACT_M, ACT_D);
       const existingTexts = new Set(td.tasks.map(t => t.text));
       undone.forEach(t => {
-        if (!existingTexts.has(t.text)) td.tasks.push({ text: t.text, done: false });
+        if (!existingTexts.has(t.text)) td.tasks.push({
+          text: t.text, done: false,
+          deadline: t.deadline, urgent: t.urgent,
+          ideaId: t.ideaId, ideaTaskId: t.ideaTaskId
+        });
       });
       saveDayData(ACT_Y, ACT_M, ACT_D, td);
     }
@@ -426,6 +430,64 @@ function saveIdeas(v) {
 
 function getIdeaById(id) {
   return getIdeas().find(p => p.id === id) || null;
+}
+
+// ==================== IDEA TASK SCHEDULING ====================
+let _ideaTaskIdCounter = Date.now();
+function generateIdeaTaskId() { return 'itask_' + (++_ideaTaskIdCounter); }
+
+function getIdeaTasksForDate(dateStr) {
+  const results = [];
+  getIdeas().forEach(idea => {
+    idea.tasks.forEach(task => {
+      if (task.scheduledDate === dateStr) {
+        results.push({ ...task, ideaId: idea.id, ideaName: idea.name, ideaEmoji: idea.emoji });
+      }
+    });
+  });
+  return results;
+}
+
+function getDayTasksWithIdeas(y, m, d) {
+  const dd = getDayData(y, m, d);
+  const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const ideaTasks = getIdeaTasksForDate(dateStr);
+  const existingTexts = new Set(dd.tasks.map(t => t.text));
+
+  const virtual = ideaTasks
+    .filter(it => !existingTexts.has(it.text))
+    .map(it => ({
+      text: it.text,
+      done: it.done,
+      urgent: it.urgent,
+      deadline: it.scheduledDate,
+      ideaId: it.ideaId,
+      ideaTaskId: it.id,
+      fromIdea: true
+    }));
+
+  return [...dd.tasks, ...virtual];
+}
+
+function toggleTaskDone(y, m, d, taskIndex, fromIdea, ideaTaskId, ideaId) {
+  if (fromIdea && ideaId && ideaTaskId) {
+    const ideas = getIdeas();
+    const idea = ideas.find(p => p.id === ideaId);
+    if (idea) {
+      const task = idea.tasks.find(t => t.id === ideaTaskId);
+      if (task) {
+        task.done = !task.done;
+        saveIdeas(ideas);
+      }
+    }
+  } else {
+    const dd = getDayData(y, m, d);
+    if (dd.tasks[taskIndex]) {
+      dd.tasks[taskIndex].done = !dd.tasks[taskIndex].done;
+      sortTasks(dd.tasks);
+      saveDayData(y, m, d, dd);
+    }
+  }
 }
 
 // ==================== FINANCE IDS ====================

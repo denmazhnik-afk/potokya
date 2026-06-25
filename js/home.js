@@ -1,8 +1,9 @@
 // ==================== HOME ====================
 function buildHome() {
-  const td = getDayData(ACT_Y, ACT_M, ACT_D);
-  const totalT = td.tasks.length;
-  const doneT = td.tasks.filter(t => t.done).length;
+  const allTasks = getDayTasksWithIdeas(ACT_Y, ACT_M, ACT_D);
+  window._currentDayTasks = allTasks;
+  const totalT = allTasks.length;
+  const doneT = allTasks.filter(t => t.done).length;
   const water = getWater();
   const waterPct = Math.round((water.cups / 6) * 100);
   const taskPct = totalT > 0 ? Math.round(doneT/totalT*100) : 0;
@@ -17,7 +18,7 @@ function buildHome() {
   const todayInc = inc.filter(e => e.date === activeDateStr()).reduce((s,e) => s + e.amount, 0);
 
   let dayTasksHTML = '';
-  const preview = td.tasks.slice(0, 3);
+  const preview = allTasks.slice(0, 3);
   if (preview.length === 0) {
     dayTasksHTML = `<div class="empty-state" style="padding:8px 0">Нет задач на сегодня</div>`;
   } else {
@@ -28,11 +29,11 @@ function buildHome() {
         ondrop="homeDrop(event,${i})" ondragend="homeDragEnd(event)">
         <span class="task-drag" title="Перетащить">⋮⋮</span>
         <div class="mini-check ${t.done ? 'done' : ''}">${t.done ? '✓' : ''}</div>
-        <span class="mini-task-text ${t.done ? 'completed' : ''}">${esc(t.text)}</span>
+        <span class="mini-task-text ${t.done ? 'completed' : ''}">${t.fromIdea ? '<span style="opacity:0.5;font-size:10px">' + esc(t.ideaEmoji || '📁') + '</span> ' : ''}${esc(t.text)}</span>
       </div>`;
     });
-    if (td.tasks.length > 3) {
-      dayTasksHTML += `<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">+${td.tasks.length-3} ещё</div>`;
+    if (allTasks.length > 3) {
+      dayTasksHTML += `<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">+${allTasks.length-3} ещё</div>`;
     }
   }
 
@@ -250,11 +251,19 @@ function buildRing(pct, size, color, label) {
 
 // ==================== TODAY TASKS ====================
 function toggleTodayTask(i) {
-  const td = getDayData(ACT_Y, ACT_M, ACT_D);
-  const wasDone = td.tasks[i].done;
-  td.tasks[i].done = !wasDone;
-  sortTasks(td.tasks);
-  saveDayData(ACT_Y, ACT_M, ACT_D, td);
+  const allTasks = getDayTasksWithIdeas(ACT_Y, ACT_M, ACT_D);
+  const t = allTasks[i];
+  if (!t) return;
+  const wasDone = t.done;
+
+  if (t.fromIdea && t.ideaId && t.ideaTaskId) {
+    toggleTaskDone(ACT_Y, ACT_M, ACT_D, i, true, t.ideaTaskId, t.ideaId);
+  } else {
+    const td = getDayData(ACT_Y, ACT_M, ACT_D);
+    const realIdx = td.tasks.findIndex(x => x.text === t.text);
+    if (realIdx >= 0) toggleTaskDone(ACT_Y, ACT_M, ACT_D, realIdx, false, null, null);
+  }
+
   if (!wasDone) addXP(XP_PER_TASK, 'Задача', `task-done-${activeDateStr()}-${i}`);
   render();
 }
@@ -272,9 +281,29 @@ function toggleDayTaskUrgent(i) {
 }
 
 function deleteDayTask(i) {
-  const td = getDayData(ACT_Y, ACT_M, ACT_D);
-  td.tasks.splice(i, 1);
-  saveDayData(ACT_Y, ACT_M, ACT_D, td);
+  const allTasks = getDayTasksWithIdeas(ACT_Y, ACT_M, ACT_D);
+  const t = allTasks[i];
+  if (!t) return;
+
+  if (t.fromIdea && t.ideaId) {
+    // Clear scheduledDate from the idea task (don't delete from project)
+    const ideas = getIdeas();
+    const idea = ideas.find(p => p.id === t.ideaId);
+    if (idea) {
+      const task = idea.tasks.find(x => x.id === t.ideaTaskId);
+      if (task) {
+        task.scheduledDate = null;
+        saveIdeas(ideas);
+      }
+    }
+  } else {
+    const td = getDayData(ACT_Y, ACT_M, ACT_D);
+    const realIdx = td.tasks.findIndex(x => x.text === t.text);
+    if (realIdx >= 0) {
+      td.tasks.splice(realIdx, 1);
+      saveDayData(ACT_Y, ACT_M, ACT_D, td);
+    }
+  }
   render();
 }
 
@@ -317,7 +346,11 @@ function pushTomorrow() {
   const tom = new Date(ACT_Y, ACT_M, ACT_D + 1);
   const tyd = getDayData(tom.getFullYear(), tom.getMonth(), tom.getDate());
   const existing = new Set(tyd.tasks.map(t => t.text));
-  undone.forEach(t => { if (!existing.has(t.text)) tyd.tasks.push({ text: t.text, done: false }); });
+  undone.forEach(t => { if (!existing.has(t.text)) tyd.tasks.push({
+    text: t.text, done: false,
+    deadline: t.deadline, urgent: t.urgent,
+    ideaId: t.ideaId, ideaTaskId: t.ideaTaskId
+  }); });
   saveDayData(tom.getFullYear(), tom.getMonth(), tom.getDate(), tyd);
 
   td.tasks = td.tasks.filter(t => t.done);

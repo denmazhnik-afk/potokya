@@ -1,6 +1,10 @@
 // ==================== PLAN PAGE ====================
 function buildPlanPage() {
   let html = `
+  <div class="page-header">
+    <button class="back-btn" onclick="goHome()">← Назад</button>
+    <h2 class="page-heading">Планировщик</h2>
+  </div>
   <div class="months-grid" id="monthsGrid">`;
 
   YEARS.forEach(y => {
@@ -80,29 +84,29 @@ function buildMonthDetail() {
   let daysHTML = '';
   for (let d = 1; d <= dim; d++) {
     const dd = getDayData(y, m, d);
-    const total = dd.tasks.length;
-    const done = dd.tasks.filter(t => t.done).length;
+    const dayAllTasks = getDayTasksWithIdeas(y, m, d);
+    const total = dayAllTasks.length;
+    const done = dayAllTasks.filter(t => t.done).length;
     const pct = total > 0 ? Math.round(done/total*100) : 0;
     const isToday = isCur && d === ACT_D;
     const wd = WEEKDAYS_FULL[new Date(y, m, d).getDay()];
 
     let tasksHTML = '';
-    dd.tasks.forEach((t, ti) => {
+    dayAllTasks.forEach((t, ti) => {
       const hasDeadline = t.deadline && !t.done;
       const isUrgent = t.urgent && !t.done;
       const dlBadge = t.deadline ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.deadline}</span>` : '';
       const urgentCls = isUrgent ? 'urgent-row' : '';
       const urgentBtn = isUrgent ? 'active' : '';
-      tasksHTML += `<li class="task-item ${t.done?'done-row':''} ${hasDeadline?'deadline-row':''} ${urgentCls}"
-        draggable="true" data-idx="${ti}" data-flip-id="mt-${d}-${flipKey(t.text)}"
-        ondragstart="monthDragStart(event,${d},${ti})" ondragover="monthDragOver(event)"
-        ondrop="monthDrop(event,${d},${ti})" ondragend="monthDragEnd(event)">
+      const ideaTag = t.fromIdea ? `<span class="idea-tag" title="Из проекта">${esc(t.ideaEmoji || '📁')}</span>` : '';
+      tasksHTML += `<li class="task-item ${t.done ? 'done-row' : ''} ${hasDeadline ? 'deadline-row' : ''} ${urgentCls}"
+        data-idx="${ti}" data-flip-id="mt-${d}-${flipKey(t.text)}">
         <span class="task-drag" title="Перетащить">⋮⋮</span>
-        <div class="task-cb ${t.done?'checked':''}" onclick="toggleMonthTask(${d},${ti})"></div>
-        <span class="task-name ${t.done?'struck':''}">${esc(t.text)}</span>
+        <div class="task-cb ${t.done ? 'checked' : ''}" onclick="toggleMonthTask(${d},${ti})"></div>
+        <span class="task-name ${t.done ? 'struck' : ''}">${ideaTag}${esc(t.text)}</span>
         ${dlBadge}
         <button class="task-urgent-btn ${urgentBtn}" onclick="toggleMonthTaskUrgent(${d},${ti})" title="Срочно">⚡</button>
-        <button class="task-del" onclick="deleteMonthTask(${d},${ti})">×</button>
+        <button class="task-del" onclick="deleteMonthTask(${d},${ti})" title="${t.fromIdea ? 'Убрать из дня' : 'Удалить'}">×</button>
       </li>`;
     });
     if (!tasksHTML) tasksHTML = `<li class="empty-state" style="padding:6px 0">Нет задач</li>`;
@@ -166,10 +170,17 @@ function buildMonthDetail() {
 // ==================== MONTH TASKS ====================
 function toggleMonthTask(d, ti) {
   const {y, m} = viewData;
-  const dd = getDayData(y, m, d);
-  dd.tasks[ti].done = !dd.tasks[ti].done;
-  sortTasks(dd.tasks);
-  saveDayData(y, m, d, dd);
+  const allTasks = getDayTasksWithIdeas(y, m, d);
+  const t = allTasks[ti];
+  if (!t) return;
+
+  if (t.fromIdea && t.ideaId && t.ideaTaskId) {
+    toggleTaskDone(y, m, d, ti, true, t.ideaTaskId, t.ideaId);
+  } else {
+    const dd = getDayData(y, m, d);
+    const realIdx = dd.tasks.findIndex(x => x.text === t.text);
+    if (realIdx >= 0) toggleTaskDone(y, m, d, realIdx, false, null, null);
+  }
   render();
 }
 
@@ -186,9 +197,28 @@ function toggleMonthTaskUrgent(d, ti) {
 
 function deleteMonthTask(d, ti) {
   const {y, m} = viewData;
-  const dd = getDayData(y, m, d);
-  dd.tasks.splice(ti, 1);
-  saveDayData(y, m, d, dd);
+  const allTasks = getDayTasksWithIdeas(y, m, d);
+  const t = allTasks[ti];
+  if (!t) return;
+
+  if (t.fromIdea && t.ideaId) {
+    const ideas = getIdeas();
+    const idea = ideas.find(p => p.id === t.ideaId);
+    if (idea) {
+      const task = idea.tasks.find(x => x.id === t.ideaTaskId);
+      if (task) {
+        task.scheduledDate = null;
+        saveIdeas(ideas);
+      }
+    }
+  } else {
+    const dd = getDayData(y, m, d);
+    const realIdx = dd.tasks.findIndex(x => x.text === t.text);
+    if (realIdx >= 0) {
+      dd.tasks.splice(realIdx, 1);
+      saveDayData(y, m, d, dd);
+    }
+  }
   render();
 }
 
