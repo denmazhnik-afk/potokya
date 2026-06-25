@@ -57,7 +57,7 @@ function buildIdeaDetail() {
     const isUrgent = t.urgent && !t.done;
     const urgentCls = isUrgent ? 'urgent-row' : '';
     const urgentBtn = isUrgent ? 'active' : '';
-    const dateBadge = t.scheduledDate ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.scheduledDate}${t.scheduledTime ? ' ' + t.scheduledTime : ''}</span>` : '';
+    const dateBadge = t.scheduledDate ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.scheduledDate}</span>` : '';
     const itemHTML = `
       <div class="task-item ${t.done ? 'done-row' : ''} ${urgentCls}"
         draggable="true" data-idx="${i}" data-flip-id="idea-${esc(idea.id)}-${i}"
@@ -67,11 +67,15 @@ function buildIdeaDetail() {
         ondragend="ideaDragEnd(event)">
         <span class="task-drag" title="Перетащить">⋮⋮</span>
         <div class="task-cb ${t.done ? 'checked' : ''}" onclick="toggleIdeaTask('${esc(idea.id)}',${i})"></div>
-        <span class="task-name ${t.done ? 'struck' : ''}">${esc(t.text)}</span>
-        ${dateBadge}
-        ${t.done ? '' : `<button class="task-urgent-btn ${urgentBtn}" onclick="toggleIdeaTaskUrgent('${esc(idea.id)}',${i})" title="Срочно">⚡</button>`}
-        <button class="ibtn" onclick="setIdeaTaskDate('${esc(idea.id)}',${i})" title="Дата">📅</button>
-        <button class="task-del" onclick="deleteIdeaTask('${esc(idea.id)}',${i})">×</button>
+        <div class="task-main">
+          <span class="task-name ${t.done ? 'struck' : ''}">${esc(t.text)}</span>
+          ${dateBadge}
+        </div>
+        <div class="task-actions">
+          ${t.done ? '' : `<button class="task-urgent-btn ${urgentBtn}" onclick="toggleIdeaTaskUrgent('${esc(idea.id)}',${i})" title="Срочно">⚡</button>`}
+          <button class="task-urgent-btn" onclick="setIdeaTaskDate('${esc(idea.id)}',${i})" title="Дата">📅</button>
+          <button class="task-del" onclick="deleteIdeaTask('${esc(idea.id)}',${i})">×</button>
+        </div>
       </div>
     `;
     if (t.done) doneTasksHTML += itemHTML;
@@ -124,7 +128,6 @@ function buildIdeaDetail() {
       <div class="add-row">
         <input class="add-input" id="ideaTaskInp" placeholder="Новая задача..." autofocus>
         <input class="add-input deadline-input" id="ideaTaskDateInp" type="date" title="Дата (необязательно)">
-        <input class="add-input deadline-input" id="ideaTaskTimeInp" type="time" title="Время (необязательно)">
         <button class="btn-primary" onclick="addIdeaTask('${esc(idea.id)}')">+</button>
       </div>
     </div>
@@ -205,11 +208,9 @@ function sortIdeaTasks(tasks) {
 function addIdeaTask(id) {
   const inp = document.getElementById('ideaTaskInp');
   const dateInp = document.getElementById('ideaTaskDateInp');
-  const timeInp = document.getElementById('ideaTaskTimeInp');
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
   const date = dateInp ? dateInp.value : '';
-  const time = timeInp ? timeInp.value : '';
 
   const ideas = getIdeas();
   const idea = ideas.find(p => p.id === id);
@@ -217,8 +218,7 @@ function addIdeaTask(id) {
     idea.tasks.push({
       id: generateIdeaTaskId(),
       text, done: false,
-      scheduledDate: date || null,
-      scheduledTime: time || null
+      scheduledDate: date || null
     });
     sortIdeaTasks(idea.tasks);
     saveIdeas(ideas);
@@ -262,13 +262,10 @@ function setIdeaTaskDate(ideaId, taskIdx) {
   if (!idea || !idea.tasks[taskIdx]) return;
   const task = idea.tasks[taskIdx];
 
-  // Remove old modal if exists
   const old = document.getElementById('dateModal');
   if (old) old.remove();
 
-  // Parse existing date and time
-  let dateVal = task.scheduledDate || '';
-  let timeVal = task.scheduledTime || '';
+  const dateVal = task.scheduledDate || todayStr();
 
   const modal = document.createElement('div');
   modal.id = 'dateModal';
@@ -276,19 +273,10 @@ function setIdeaTaskDate(ideaId, taskIdx) {
   modal.innerHTML = `
     <div class="date-modal">
       <div class="date-modal-title">${esc(task.text)}</div>
-      <div class="date-modal-row">
-        <div class="date-modal-field">
-          <label class="date-modal-label">Дата</label>
-          <input class="date-modal-input" id="dateModalInput" type="date" value="${dateVal}">
-        </div>
-        <div class="date-modal-field">
-          <label class="date-modal-label">Время</label>
-          <input class="date-modal-input" id="dateModalTime" type="time" value="${timeVal}">
-        </div>
-      </div>
+      <input class="date-modal-input" id="dateModalInput" type="date" value="${dateVal}">
       <div class="date-modal-actions">
         <button class="date-modal-btn save" onclick="confirmSetIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✓ Сохранить</button>
-        <button class="date-modal-btn remove" onclick="clearIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✕ Убрать</button>
+        <button class="date-modal-btn remove" onclick="clearIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✕ Убрать дату</button>
         <button class="date-modal-btn cancel" onclick="cancelSetIdeaTaskDate()">Отмена</button>
       </div>
     </div>
@@ -299,12 +287,10 @@ function setIdeaTaskDate(ideaId, taskIdx) {
 
 function confirmSetIdeaTaskDate(ideaId, taskIdx) {
   const dateInp = document.getElementById('dateModalInput');
-  const timeInp = document.getElementById('dateModalTime');
   const ideas = getIdeas();
   const idea = ideas.find(p => p.id === ideaId);
   if (idea && idea.tasks[taskIdx]) {
     idea.tasks[taskIdx].scheduledDate = (dateInp && dateInp.value) || null;
-    idea.tasks[taskIdx].scheduledTime = (timeInp && timeInp.value) || null;
     saveIdeas(ideas);
   }
   const modal = document.getElementById('dateModal');
@@ -317,7 +303,6 @@ function clearIdeaTaskDate(ideaId, taskIdx) {
   const idea = ideas.find(p => p.id === ideaId);
   if (idea && idea.tasks[taskIdx]) {
     idea.tasks[taskIdx].scheduledDate = null;
-    idea.tasks[taskIdx].scheduledTime = null;
     saveIdeas(ideas);
   }
   const modal = document.getElementById('dateModal');

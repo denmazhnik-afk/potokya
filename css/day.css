@@ -539,6 +539,34 @@
   opacity: 0.7;
 }
 
+.task-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .task-actions {
+    gap: 1px;
+  }
+  .task-actions .task-urgent-btn,
+  .task-actions .task-del {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
 .deadline-input {
   max-width: 150px;
   font-size: 12px !important;
