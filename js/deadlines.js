@@ -31,7 +31,7 @@ function buildDeadlinesPage() {
           <div class="deadline-status">${statusText}</div>
           <div class="deadline-content">
             <div class="deadline-text ${item.done ? 'done' : ''}">${esc(item.text)}</div>
-            <div class="deadline-date">${formatDateRu(item.deadline)}</div>
+            <div class="deadline-date">${item.deadline}</div>
           </div>
           <button class="deadline-toggle" onclick="toggleDeadlineTask(${item.dayY},${item.dayM},${item.dayD},${item.taskIdx})">
             ${item.done ? '✓' : '○'}

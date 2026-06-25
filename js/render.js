@@ -442,7 +442,6 @@ async function init() {
   initTouchDrag();
   render();
   startPeriodicSync();
-  scheduleReminders();
   await loadFromServer();
   render();
 }
