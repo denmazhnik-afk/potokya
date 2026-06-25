@@ -57,7 +57,8 @@ function buildIdeaDetail() {
     const isUrgent = t.urgent && !t.done;
     const urgentCls = isUrgent ? 'urgent-row' : '';
     const urgentBtn = isUrgent ? 'active' : '';
-    const dateBadge = t.scheduledDate ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.scheduledDate}</span>` : '';
+    const dateBadge = t.scheduledDate ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${formatDateRu(t.scheduledDate)}</span>` : '';
+    const reminderBadge = t.reminder ? `<span class="task-reminder-badge" title="Напоминание">🔔 ${t.reminder}</span>` : '';
     const itemHTML = `
       <div class="task-item ${t.done ? 'done-row' : ''} ${urgentCls}"
         draggable="true" data-idx="${i}" data-flip-id="idea-${esc(idea.id)}-${i}"
@@ -69,11 +70,12 @@ function buildIdeaDetail() {
         <div class="task-cb ${t.done ? 'checked' : ''}" onclick="toggleIdeaTask('${esc(idea.id)}',${i})"></div>
         <div class="task-main">
           <span class="task-name ${t.done ? 'struck' : ''}">${esc(t.text)}</span>
-          ${dateBadge}
+          ${dateBadge}${reminderBadge}
         </div>
         <div class="task-actions">
           ${t.done ? '' : `<button class="task-urgent-btn ${urgentBtn}" onclick="toggleIdeaTaskUrgent('${esc(idea.id)}',${i})" title="Срочно">⚡</button>`}
           <button class="task-urgent-btn" onclick="setIdeaTaskDate('${esc(idea.id)}',${i})" title="Дата">📅</button>
+          ${t.done ? '' : `<button class="task-urgent-btn ${t.reminder ? 'active' : ''}" onclick="setIdeaTaskReminder('${esc(idea.id)}',${i})" title="Напоминание">🔔</button>`}
           <button class="task-del" onclick="deleteIdeaTask('${esc(idea.id)}',${i})">×</button>
         </div>
       </div>
@@ -125,9 +127,9 @@ function buildIdeaDetail() {
       <div class="idea-tasks-list">
         ${tasksHTML}
       </div>
-      <div class="add-row">
+      <div class="add-row idea-add-row">
         <input class="add-input" id="ideaTaskInp" placeholder="Новая задача..." autofocus>
-        <input class="add-input deadline-input" id="ideaTaskDateInp" type="date" title="Дата (необязательно)">
+        <input class="add-input deadline-input" id="ideaTaskDateInp" type="date" value="${todayStr()}" title="Дата">
         <button class="btn-primary" onclick="addIdeaTask('${esc(idea.id)}')">+</button>
       </div>
     </div>
@@ -223,6 +225,7 @@ function addIdeaTask(id) {
     sortIdeaTasks(idea.tasks);
     saveIdeas(ideas);
     render();
+    scheduleReminders();
   }
 }
 
@@ -313,6 +316,75 @@ function clearIdeaTaskDate(ideaId, taskIdx) {
 function cancelSetIdeaTaskDate() {
   const modal = document.getElementById('dateModal');
   if (modal) modal.remove();
+}
+
+// ==================== IDEA TASK REMINDER ====================
+function setIdeaTaskReminder(ideaId, taskIdx) {
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (!idea || !idea.tasks[taskIdx]) return;
+  const task = idea.tasks[taskIdx];
+
+  const old = document.getElementById('dateModal');
+  if (old) old.remove();
+
+  const dateVal = task.scheduledDate || todayStr();
+  const timeVal = task.reminder || '09:00';
+
+  const modal = document.createElement('div');
+  modal.id = 'dateModal';
+  modal.className = 'date-modal-overlay';
+  modal.innerHTML = `
+    <div class="date-modal">
+      <div class="date-modal-title">🔔 Напоминание: ${esc(task.text)}</div>
+      <div class="date-modal-row">
+        <div class="date-modal-field">
+          <label class="date-modal-label">Дата</label>
+          <input class="date-modal-input" id="reminderDateInput" type="date" value="${dateVal}">
+        </div>
+        <div class="date-modal-field">
+          <label class="date-modal-label">Время</label>
+          <input class="date-modal-input" id="reminderTimeInput" type="time" value="${timeVal}">
+        </div>
+      </div>
+      <div class="date-modal-actions">
+        <button class="date-modal-btn save" onclick="confirmSetIdeaTaskReminder('${esc(ideaId)}',${taskIdx})">✓ Поставить</button>
+        <button class="date-modal-btn remove" onclick="clearIdeaTaskReminder('${esc(ideaId)}',${taskIdx})">✕ Убрать</button>
+        <button class="date-modal-btn cancel" onclick="cancelSetIdeaTaskDate()">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) cancelSetIdeaTaskDate(); });
+}
+
+function confirmSetIdeaTaskReminder(ideaId, taskIdx) {
+  const dateInp = document.getElementById('reminderDateInput');
+  const timeInp = document.getElementById('reminderTimeInput');
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (idea && idea.tasks[taskIdx]) {
+    idea.tasks[taskIdx].scheduledDate = (dateInp && dateInp.value) || null;
+    idea.tasks[taskIdx].reminder = (timeInp && timeInp.value) || null;
+    saveIdeas(ideas);
+    scheduleReminders();
+  }
+  const modal = document.getElementById('dateModal');
+  if (modal) modal.remove();
+  render();
+}
+
+function clearIdeaTaskReminder(ideaId, taskIdx) {
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (idea && idea.tasks[taskIdx]) {
+    idea.tasks[taskIdx].reminder = null;
+    saveIdeas(ideas);
+    scheduleReminders();
+  }
+  const modal = document.getElementById('dateModal');
+  if (modal) modal.remove();
+  render();
 }
 
 // ==================== IDEA DONE TOGGLE ====================

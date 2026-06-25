@@ -134,6 +134,13 @@ function flipKey(text) {
   return String(text || '').replace(/[^a-zA-Zа-яА-ЯёЁ0-9]/g, '_').substring(0, 40);
 }
 
+function formatDateRu(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return parts[2] + '.' + parts[1] + '.' + parts[0];
+}
+
 function fmtRub(n) {
   return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' ₽';
 }
@@ -493,3 +500,45 @@ function toggleTaskDone(y, m, d, taskIndex, fromIdea, ideaTaskId, ideaId) {
 // ==================== FINANCE IDS ====================
 let _finId = Date.now();
 function nextId() { return ++_finId; }
+
+// ==================== REMINDERS ====================
+let _reminderTimers = {};
+
+function scheduleReminders() {
+  // Clear old timers
+  Object.values(_reminderTimers).forEach(t => clearTimeout(t));
+  _reminderTimers = {};
+
+  // Request notification permission on first use
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
+  getIdeas().forEach(idea => {
+    idea.tasks.forEach(task => {
+      if (task.done || !task.scheduledDate || !task.reminder) return;
+
+      const parts = task.scheduledDate.split('-').map(Number);
+      const tparts = task.reminder.split(':').map(Number);
+      const target = new Date(parts[0], parts[1] - 1, parts[2], tparts[0], tparts[1], 0);
+      const diff = target.getTime() - Date.now();
+
+      if (diff <= 0) return; // already past
+      if (diff > 7 * 24 * 60 * 60 * 1000) return; // too far ahead
+
+      const timerId = setTimeout(() => {
+        const title = '🔔 ' + task.text;
+        const body = 'Проект: ' + idea.name;
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, { body, icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🔔</text></svg>' });
+        }
+
+        // Also show in-app toast
+        showSyncStatus(title + ' — ' + body, 'success');
+      }, diff);
+
+      _reminderTimers[idea.id + '_' + task.id] = timerId;
+    });
+  });
+}
