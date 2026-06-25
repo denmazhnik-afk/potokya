@@ -1,18 +1,5 @@
-// ==================== SUPABASE SETUP ====================
-let supabaseClient = null;
-
-if (typeof window.supabase !== 'undefined') {
-  supabaseClient = window.supabase.createClient(
-    'https://qgmzuhprvbdwjgtwajei.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnbXp1aHBydmJkd2pndHdhamVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMzQ5NDcsImV4cCI6MjA5NzgxMDk0N30.lZ_qaVEZ1UR4btb2VvgD60sGH39fa10hj2iCB9wFo8I'
-  );
-  console.log('✅ Supabase client created');
-} else {
-  console.warn('❌ Supabase library not loaded');
-}
-
-// ==================== STATE ====================
-let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
+// ==================== SYNC (via Vercel proxy) ====================
+const PROXY_URL = '/api/sync';
 let isSyncing = false;
 let lastSync = 0;
 
@@ -28,78 +15,65 @@ function showSyncStatus(text, type = 'syncing') {
   }
 }
 
-// Синхронизация В СУПЕЙБАЗ
-async function syncToSupabase() {
-  if (!supabaseClient || isSyncing) return;
-
+async function syncToServer() {
+  if (isSyncing) return;
   isSyncing = true;
   showSyncStatus('Синхронизация...');
 
   try {
-    const { error } = await supabaseClient
-      .from('app_state')
-      .upsert({
-        key: 'planner_data',
-        data: localStore,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'key' });
-
-    if (error) throw error;
-
+    const r = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: localStore }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + r.status);
+    }
     lastSync = Date.now();
     showSyncStatus('Синхронизировано', 'success');
   } catch (err) {
     console.error('Sync error:', err);
-    showSyncStatus('Ошибка: ' + err.message, 'error');
+    showSyncStatus('Ошибка синхронизации', 'error');
   } finally {
     isSyncing = false;
   }
 }
 
-// Загрузка ИЗ СУПЕЙБАЗА
-async function loadFromSupabase() {
-  if (!supabaseClient) {
-    console.log('Working in local mode');
-    return;
-  }
-
+async function loadFromServer() {
   try {
-    const { data, error } = await supabaseClient
-      .from('app_state')
-      .select('data')
-      .eq('key', 'planner_data')
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-
-    if (data && data.data) {
-      localStore = data.data;
+    const r = await fetch(PROXY_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const json = await r.json();
+    if (json && json.data) {
+      localStore = json.data;
       localStorage.setItem('plannerV2', JSON.stringify(localStore));
       showSyncStatus('Данные загружены', 'success');
     }
   } catch (err) {
-    console.error('Load error:', err);
+    console.log('Server sync unavailable, using local data');
   }
 }
 
+// ==================== STATE ====================
+let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
+
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
-  if (supabaseClient && Date.now() - lastSync > 2000) {
-    setTimeout(() => syncToSupabase(), 500);
+  if (Date.now() - lastSync > 2000) {
+    setTimeout(() => syncToServer(), 500);
   }
 }
 
 // ==================== PERIODIC SYNC ====================
 function startPeriodicSync() {
-  // Push to Supabase every 30s if there were local changes
   setInterval(() => {
-    if (supabaseClient && !isSyncing) syncToSupabase();
+    if (!isSyncing) syncToServer();
   }, 30000);
 
-  // Pull from Supabase when user returns to tab
   document.addEventListener('visibilitychange', async () => {
-    if (!document.hidden && supabaseClient) {
-      await loadFromSupabase();
+    if (!document.hidden) {
+      await loadFromServer();
       render();
     }
   });
@@ -183,15 +157,12 @@ function getDayData(y, m, d) {
   return localStore[k];
 }
 
-// Сортировка: невыполненные сверху, выполненные вниз
 function sortTasks(tasks) {
   tasks.sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
-    // Deadlines first
     if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
     if (a.deadline) return -1;
     if (b.deadline) return 1;
-    // Then urgent
     if (a.urgent && !b.urgent) return -1;
     if (!a.urgent && b.urgent) return 1;
     return 0;
@@ -308,13 +279,11 @@ function addXP(amount, reason, actionKey) {
   const todayKey = activeDateStr();
   if (!localStore._xpLog[todayKey]) localStore._xpLog[todayKey] = {};
 
-  // Don't double-count the same action today
   if (actionKey && localStore._xpLog[todayKey][actionKey]) return false;
 
   localStore._xp += amount;
   if (actionKey) localStore._xpLog[todayKey][actionKey] = amount;
 
-  // Clean up logs older than 30 days
   const cutoff = new Date(ACT_Y, ACT_M, ACT_D - 30);
   const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${cutoff.getDate()}`;
   Object.keys(localStore._xpLog).forEach(k => { if (k < cutoffKey) delete localStore._xpLog[k]; });
@@ -325,17 +294,12 @@ function addXP(amount, reason, actionKey) {
 }
 
 function getXP() { return localStore._xp || 0; }
-
 function getLevel() { return Math.floor(getXP() / XP_PER_LEVEL); }
-
 function getXPInLevel() { return getXP() % XP_PER_LEVEL; }
-
 function getXPProgress() { return getXPInLevel(); }
-
 function getLevelBarWidth() { return Math.floor(getXPInLevel() / XP_PER_LEVEL * 100); }
 
 // ==================== STREAKS ====================
-// Counts consecutive completed days starting from a given date
 function _countStreakFrom(startDate) {
   let streak = 0;
   const d = new Date(startDate);
@@ -349,18 +313,14 @@ function _countStreakFrom(startDate) {
   return streak;
 }
 
-// Returns [displayCount, isActive]
-// isActive=true → golden (today is done), isActive=false → grey (yesterday's streak)
 function getStreak() {
   const todayDone = _countStreakFrom(new Date(ACT_Y, ACT_M, ACT_D));
   if (todayDone > 0) return todayDone;
 
-  // Today not done yet — show yesterday's streak in grey
   const yesterday = new Date(ACT_Y, ACT_M, ACT_D - 1);
   const yd = getDayData(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
   if (yd.tasks.length > 0 && yd.tasks.every(t => t.done)) {
-    const yestStreak = _countStreakFrom(yesterday);
-    return -yestStreak; // negative = grey
+    return -_countStreakFrom(yesterday);
   }
 
   return 0;

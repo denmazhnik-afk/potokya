@@ -3,13 +3,34 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const TABLE = 'app_state';
 const ROW_KEY = 'planner_data';
 
-export const config = { api: { bodyParser: true } };
+export const config = {
+  api: { bodyParser: false },
+};
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve(JSON.parse(raw));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   const headers = {
     'apikey': SUPABASE_KEY,
@@ -18,18 +39,21 @@ export default async function handler(req, res) {
   };
 
   try {
+    // GET — загрузка данных
     if (req.method === 'GET') {
       const url = `${SUPABASE_URL}/rest/v1/${TABLE}?key=eq.${ROW_KEY}&select=data`;
       const r = await fetch(url, { headers });
       const json = await r.json();
-      if (json && json.length > 0 && json[0].data) {
+      if (Array.isArray(json) && json.length > 0 && json[0].data) {
         return res.status(200).json({ data: json[0].data });
       }
       return res.status(200).json({ data: null });
     }
 
+    // POST — сохранение данных
     if (req.method === 'POST') {
-      const { data } = req.body;
+      const body = await readBody(req);
+      const { data } = body;
 
       const url = `${SUPABASE_URL}/rest/v1/${TABLE}`;
       const r = await fetch(url, {
@@ -38,9 +62,10 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           key: ROW_KEY,
           data: data,
-          updated_at: new Date().toISOString()
-        })
+          updated_at: new Date().toISOString(),
+        }),
       });
+
       const json = await r.json();
       if (r.ok) {
         return res.status(200).json({ ok: true });

@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/sync.js": {
+      "runtime": "@vercel/node@3",
+      "maxDuration": 30
+    }
+  }
+}
