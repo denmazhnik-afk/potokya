@@ -48,7 +48,7 @@ function buildHome() {
     const segs = mmd.goals.slice(0, 5).map(g =>
       `<div class="month-mini-seg ${g.done ? 'done' : ''}"></div>`).join('');
     const isCur = y === TODAY_Y && m === TODAY_M;
-    monthMini += `<div class="month-mini-item">
+    monthMini += `<div class="month-mini-item" onclick="event.stopPropagation();openMonthDetail(${y},${m})">
       <span class="month-mini-name ${isCur ? 'current' : ''}">${isCur ? '● ' : ''}${MONTHS_SHORT[m]} ${y}</span>
       <div class="month-mini-bar">${segs}</div>
     </div>`;
