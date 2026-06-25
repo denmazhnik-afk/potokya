@@ -379,6 +379,11 @@
   color: #f59e0b;
   box-shadow: 0 0 10px rgba(242,192,99,0.1);
 }
+.streak-badge.pending {
+  background: rgba(242,192,99,0.06);
+  border-color: rgba(242,192,99,0.15);
+  color: rgba(242,192,99,0.5);
+}
 
 .days-left-tag {
   background: rgba(107,227,164,0.1);

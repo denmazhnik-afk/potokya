@@ -78,7 +78,12 @@ function buildHome() {
 
         <div class="day-top-row">
           <div class="panel-title">День</div>
-          <div class="streak-badge ${getStreak() > 0 ? 'active' : ''}">🔥 ${getStreak()} дн.</div>
+          ${(() => {
+            const s = getStreak();
+            const abs = Math.abs(s);
+            const active = s > 0;
+            return `<div class="streak-badge ${active ? 'active' : 'pending'}">🔥 ${abs} дн.</div>`;
+          })()}
         </div>
 
         <div class="rings-row">

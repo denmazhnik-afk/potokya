@@ -335,18 +335,35 @@ function getXPProgress() { return getXPInLevel(); }
 function getLevelBarWidth() { return Math.floor(getXPInLevel() / XP_PER_LEVEL * 100); }
 
 // ==================== STREAKS ====================
-function getStreak() {
+// Counts consecutive completed days starting from a given date
+function _countStreakFrom(startDate) {
   let streak = 0;
-  const d = new Date(ACT_Y, ACT_M, ACT_D);
+  const d = new Date(startDate);
   for (let i = 0; i < 365; i++) {
     const dd = getDayData(d.getFullYear(), d.getMonth(), d.getDate());
     if (dd.tasks.length === 0) { if (i === 0) { d.setDate(d.getDate()-1); continue; } break; }
-    const allDone = dd.tasks.every(t => t.done);
-    if (!allDone) break;
+    if (!dd.tasks.every(t => t.done)) break;
     streak++;
     d.setDate(d.getDate()-1);
   }
   return streak;
+}
+
+// Returns [displayCount, isActive]
+// isActive=true → golden (today is done), isActive=false → grey (yesterday's streak)
+function getStreak() {
+  const todayDone = _countStreakFrom(new Date(ACT_Y, ACT_M, ACT_D));
+  if (todayDone > 0) return todayDone;
+
+  // Today not done yet — show yesterday's streak in grey
+  const yesterday = new Date(ACT_Y, ACT_M, ACT_D - 1);
+  const yd = getDayData(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+  if (yd.tasks.length > 0 && yd.tasks.every(t => t.done)) {
+    const yestStreak = _countStreakFrom(yesterday);
+    return -yestStreak; // negative = grey
+  }
+
+  return 0;
 }
 
 // ==================== SLEEP ====================
