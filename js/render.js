@@ -191,7 +191,6 @@ function openIdeaDetail(id) {
 
 // ==================== SIDEBAR / TABBAR NAV ====================
 function navTo(section) {
-  event.preventDefault();
   if (section === 'plan') openMonthDetail(ACT_Y, ACT_M);
   else if (section === 'home') goHome();
   else if (section === 'ideas') openIdeas();
