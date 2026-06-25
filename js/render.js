@@ -114,7 +114,7 @@ function afterRender() {
     }, 100);
   }
 
-  const inputs = ['newGoalInp','goalEditInp','balAmtIn','incAmtIn','wishNameIn','ideaTaskInp'];
+  const inputs = ['newGoalInp','goalEditInp','wishNameIn','ideaTaskInp'];
   inputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.focus();
@@ -191,6 +191,7 @@ function openIdeaDetail(id) {
 
 // ==================== SIDEBAR / TABBAR NAV ====================
 function navTo(section) {
+  event.preventDefault();
   if (section === 'plan') openMonthDetail(ACT_Y, ACT_M);
   else if (section === 'home') goHome();
   else if (section === 'ideas') openIdeas();
@@ -199,7 +200,8 @@ function navTo(section) {
 function updateNav() {
   const section = view === 'home' ? 'home'
     : (view === 'ideas' || view === 'idea-detail') ? 'ideas'
-    : 'plan';
+    : (view === 'plan' || view === 'month-detail') ? 'plan'
+    : '';
 
   document.querySelectorAll('.sidebar-btn, .tabbar-btn').forEach(function(btn) {
     if (btn.dataset.view === section) btn.classList.add('active');
