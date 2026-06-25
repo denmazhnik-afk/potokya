@@ -325,7 +325,7 @@ function confirmDayTask() {
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
   const task = { text, done: false };
-  if (dlInp && dlInp.value) task.deadline = dlInp.value;
+  
   const td = getDayData(ACT_Y, ACT_M, ACT_D);
   td.tasks.push(task);
   sortTasks(td.tasks);

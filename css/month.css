@@ -85,6 +85,15 @@
 
 .goal-item:hover { background: rgba(255,255,255,0.05); }
 
+.goal-item:hover .goal-drag {
+  opacity: 1;
+}
+
+.goal-drag {
+  width: 14px;
+  flex-shrink: 0;
+}
+
 .goal-circle {
   width: 22px; height: 22px;
   border-radius: 50%;

@@ -135,7 +135,7 @@ function flipKey(text) {
 }
 
 function fmtRub(n) {
-  return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' ₽';
+  return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + '\u00A0₽';
 }
 
 function getCalendarDays(y, m) {
@@ -461,10 +461,10 @@ function getDayTasksWithIdeas(y, m, d) {
       done: it.done,
       urgent: it.urgent,
       deadline: it.scheduledDate,
-      scheduledTime: it.scheduledTime || null,
       ideaId: it.ideaId,
       ideaTaskId: it.id,
-      fromIdea: true
+      fromIdea: true,
+      ideaEmoji: it.ideaEmoji
     }));
 
   return [...dd.tasks, ...virtual];

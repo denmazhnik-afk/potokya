@@ -210,7 +210,7 @@ function updateNav() {
 }
 
 function resetUI() {
-  uiState = { addingGoal:false, editingGoal:-1, addingTask:{}, editingNote:null, finTab: uiState.finTab||'balance', addingWish:false, ideaDoneExpanded: null };
+  uiState = { addingGoal:false, editingGoal:-1, addingTask:{}, editingNote:null, finTab: uiState.finTab||'balance', addingWish:false, ideaDoneExpanded: null, ideaAddDate: null };
 }
 
 // ==================== SCROLL TO TOP ====================
@@ -247,8 +247,10 @@ function touchDragStart(e) {
   const handle = e.target.closest('.task-drag');
   if (!handle) return;
 
-  const item = handle.closest('.task-item, .day-task-mini');
+  const item = handle.closest('.task-item, .day-task-mini, .goal-item');
   if (!item) return;
+
+  if (item.closest('.day-card .task-list') && !item.hasAttribute('data-real-idx')) return;
 
   e.preventDefault();
   const touch = e.touches[0];
@@ -256,20 +258,31 @@ function touchDragStart(e) {
   // Determine what kind of list this is
   let type = 'day';
   let dragId = null;
-  if (item.closest('.idea-tasks-list')) {
+  let dragIdx = null;
+  if (item.closest('.goals-list')) {
+    type = 'goal';
+    dragIdx = parseInt(item.getAttribute('data-idx'));
+  } else if (item.closest('.idea-tasks-list')) {
     type = 'idea';
     dragId = viewData.id;
+    dragIdx = parseInt(item.getAttribute('data-idx'));
   } else if (item.closest('.panel-day .day-tasks-col')) {
     type = 'home';
+    dragIdx = parseInt(item.getAttribute('data-idx'));
   } else if (item.closest('.day-card .task-list')) {
     type = 'month';
     const card = item.closest('.day-card');
     if (card && card.id) dragId = card.id.replace('dc-', '');
+    dragIdx = parseInt(item.getAttribute('data-real-idx'));
+  } else {
+    dragIdx = parseInt(item.getAttribute('data-idx'));
   }
+
+  if (isNaN(dragIdx)) return;
 
   _touchDrag.active = true;
   _touchDrag.el = item;
-  _touchDrag.idx = parseInt(item.getAttribute('data-idx'));
+  _touchDrag.idx = dragIdx;
   _touchDrag.id = dragId;
   _touchDrag.type = type;
   _touchDrag.startY = touch.clientY;
@@ -308,10 +321,18 @@ function touchDragMove(e) {
   _touchDrag.targetIdx = null;
 
   if (!elBelow) return;
-  const target = elBelow.closest('.task-item, .day-task-mini');
+  const target = elBelow.closest('.task-item, .day-task-mini, .goal-item');
   if (!target || target === _touchDrag.el) return;
 
-  const tIdx = parseInt(target.getAttribute('data-idx'));
+  let tIdx = null;
+  if (_touchDrag.type === 'month') {
+    if (!target.hasAttribute('data-real-idx')) return;
+    tIdx = parseInt(target.getAttribute('data-real-idx'));
+  } else if (_touchDrag.type === 'goal') {
+    tIdx = parseInt(target.getAttribute('data-idx'));
+  } else {
+    tIdx = parseInt(target.getAttribute('data-idx'));
+  }
   if (isNaN(tIdx)) return;
   _touchDrag.targetIdx = tIdx;
   target.classList.add('touch-drag-over');
@@ -346,8 +367,17 @@ function touchDragEnd(e) {
       const dayNum = parseInt(_touchDrag.id);
       const dd = getDayData(y, m, dayNum);
       const [item] = dd.tasks.splice(fromIdx, 1);
-      dd.tasks.splice(toIdx, 0, item);
+      const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
+      dd.tasks.splice(insertAt, 0, item);
       saveDayData(y, m, dayNum, dd);
+      render();
+    } else if (type === 'goal') {
+      const { y, m } = viewData;
+      const md = getMonthData(y, m);
+      const [item] = md.goals.splice(fromIdx, 1);
+      const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
+      md.goals.splice(insertAt, 0, item);
+      saveMonthData(y, m, md);
       render();
     } else if (type === 'idea') {
       const ideas = getIdeas();

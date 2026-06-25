@@ -57,7 +57,9 @@ function buildIdeaDetail() {
     const isUrgent = t.urgent && !t.done;
     const urgentCls = isUrgent ? 'urgent-row' : '';
     const urgentBtn = isUrgent ? 'active' : '';
-    const dateBadge = t.scheduledDate ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.scheduledDate}${t.scheduledTime ? ' ' + t.scheduledTime : ''}</span>` : '';
+    const dateBadge = t.scheduledDate
+      ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${formatDateDisplay(t.scheduledDate)}</span>`
+      : '';
     const itemHTML = `
       <div class="task-item ${t.done ? 'done-row' : ''} ${urgentCls}"
         draggable="true" data-idx="${i}" data-flip-id="idea-${esc(idea.id)}-${i}"
@@ -121,10 +123,11 @@ function buildIdeaDetail() {
       <div class="idea-tasks-list">
         ${tasksHTML}
       </div>
-      <div class="add-row">
+      <div class="add-row idea-add-row">
         <input class="add-input" id="ideaTaskInp" placeholder="Новая задача..." autofocus>
-        <input class="add-input deadline-input" id="ideaTaskDateInp" type="date" title="Дата (необязательно)">
-        <input class="add-input deadline-input" id="ideaTaskTimeInp" type="time" title="Время (необязательно)">
+        <button type="button" class="date-pick-btn ${uiState.ideaAddDate ? 'has-date' : ''}" onclick="openIdeaAddDatePicker()">
+          📅 ${uiState.ideaAddDate ? formatDateDisplay(uiState.ideaAddDate) : 'Дата'}
+        </button>
         <button class="btn-primary" onclick="addIdeaTask('${esc(idea.id)}')">+</button>
       </div>
     </div>
@@ -204,12 +207,9 @@ function sortIdeaTasks(tasks) {
 
 function addIdeaTask(id) {
   const inp = document.getElementById('ideaTaskInp');
-  const dateInp = document.getElementById('ideaTaskDateInp');
-  const timeInp = document.getElementById('ideaTaskTimeInp');
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
-  const date = dateInp ? dateInp.value : '';
-  const time = timeInp ? timeInp.value : '';
+  const date = uiState.ideaAddDate || null;
 
   const ideas = getIdeas();
   const idea = ideas.find(p => p.id === id);
@@ -217,13 +217,28 @@ function addIdeaTask(id) {
     idea.tasks.push({
       id: generateIdeaTaskId(),
       text, done: false,
-      scheduledDate: date || null,
-      scheduledTime: time || null
+      scheduledDate: date
     });
     sortIdeaTasks(idea.tasks);
     saveIdeas(ideas);
+    uiState.ideaAddDate = null;
     render();
   }
+}
+
+function openIdeaAddDatePicker() {
+  openDatePicker({
+    date: uiState.ideaAddDate || null,
+    title: 'Дата новой задачи',
+    onSave: (date) => {
+      uiState.ideaAddDate = date;
+      render();
+    },
+    onClear: () => {
+      uiState.ideaAddDate = null;
+      render();
+    }
+  });
 }
 
 function toggleIdeaTask(id, idx) {
@@ -262,72 +277,30 @@ function setIdeaTaskDate(ideaId, taskIdx) {
   if (!idea || !idea.tasks[taskIdx]) return;
   const task = idea.tasks[taskIdx];
 
-  // Remove old modal if exists
-  const old = document.getElementById('dateModal');
-  if (old) old.remove();
-
-  // Parse existing date and time
-  let dateVal = task.scheduledDate || '';
-  let timeVal = task.scheduledTime || '';
-
-  const modal = document.createElement('div');
-  modal.id = 'dateModal';
-  modal.className = 'date-modal-overlay';
-  modal.innerHTML = `
-    <div class="date-modal">
-      <div class="date-modal-title">${esc(task.text)}</div>
-      <div class="date-modal-row">
-        <div class="date-modal-field">
-          <label class="date-modal-label">Дата</label>
-          <input class="date-modal-input" id="dateModalInput" type="date" value="${dateVal}">
-        </div>
-        <div class="date-modal-field">
-          <label class="date-modal-label">Время</label>
-          <input class="date-modal-input" id="dateModalTime" type="time" value="${timeVal}">
-        </div>
-      </div>
-      <div class="date-modal-actions">
-        <button class="date-modal-btn save" onclick="confirmSetIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✓ Сохранить</button>
-        <button class="date-modal-btn remove" onclick="clearIdeaTaskDate('${esc(ideaId)}',${taskIdx})">✕ Убрать</button>
-        <button class="date-modal-btn cancel" onclick="cancelSetIdeaTaskDate()">Отмена</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target === modal) cancelSetIdeaTaskDate(); });
-}
-
-function confirmSetIdeaTaskDate(ideaId, taskIdx) {
-  const dateInp = document.getElementById('dateModalInput');
-  const timeInp = document.getElementById('dateModalTime');
-  const ideas = getIdeas();
-  const idea = ideas.find(p => p.id === ideaId);
-  if (idea && idea.tasks[taskIdx]) {
-    idea.tasks[taskIdx].scheduledDate = (dateInp && dateInp.value) || null;
-    idea.tasks[taskIdx].scheduledTime = (timeInp && timeInp.value) || null;
-    saveIdeas(ideas);
-  }
-  const modal = document.getElementById('dateModal');
-  if (modal) modal.remove();
-  render();
-}
-
-function clearIdeaTaskDate(ideaId, taskIdx) {
-  const ideas = getIdeas();
-  const idea = ideas.find(p => p.id === ideaId);
-  if (idea && idea.tasks[taskIdx]) {
-    idea.tasks[taskIdx].scheduledDate = null;
-    idea.tasks[taskIdx].scheduledTime = null;
-    saveIdeas(ideas);
-  }
-  const modal = document.getElementById('dateModal');
-  if (modal) modal.remove();
-  render();
-}
-
-function cancelSetIdeaTaskDate() {
-  const modal = document.getElementById('dateModal');
-  if (modal) modal.remove();
+  openDatePicker({
+    date: task.scheduledDate || null,
+    title: task.text,
+    onSave: (date) => {
+      const list = getIdeas();
+      const proj = list.find(p => p.id === ideaId);
+      if (proj && proj.tasks[taskIdx]) {
+        proj.tasks[taskIdx].scheduledDate = date;
+        delete proj.tasks[taskIdx].scheduledTime;
+        saveIdeas(list);
+        render();
+      }
+    },
+    onClear: () => {
+      const list = getIdeas();
+      const proj = list.find(p => p.id === ideaId);
+      if (proj && proj.tasks[taskIdx]) {
+        proj.tasks[taskIdx].scheduledDate = null;
+        delete proj.tasks[taskIdx].scheduledTime;
+        saveIdeas(list);
+        render();
+      }
+    }
+  });
 }
 
 // ==================== IDEA DONE TOGGLE ====================

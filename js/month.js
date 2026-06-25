@@ -57,7 +57,10 @@ function buildMonthDetail() {
         </div>
       </div>`;
     } else {
-      goalsHTML += `<div class="goal-item">
+      goalsHTML += `<div class="goal-item" draggable="true" data-idx="${i}" data-flip-id="goal-${flipKey(g.text)}"
+        ondragstart="goalDragStart(event,${i})" ondragover="goalDragOver(event)"
+        ondrop="goalDrop(event,${i})" ondragend="goalDragEnd(event)">
+        <span class="task-drag goal-drag" title="Перетащить">⋮⋮</span>
         <div class="goal-circle ${g.done ? 'filled' : ''}" onclick="toggleGoal(${i})">${g.done ? '✓' : ''}</div>
         <span class="goal-text ${g.done ? 'struck' : ''}">${esc(g.text) || '<em style="color:var(--text-tertiary)">Без названия</em>'}</span>
         <div class="inline-btns">
@@ -95,13 +98,20 @@ function buildMonthDetail() {
     dayAllTasks.forEach((t, ti) => {
       const hasDeadline = t.deadline && !t.done;
       const isUrgent = t.urgent && !t.done;
-      const dlBadge = t.deadline ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.deadline}</span>` : '';
+      const dlBadge = t.deadline ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${formatDateDisplay(t.deadline)}</span>` : '';
       const urgentCls = isUrgent ? 'urgent-row' : '';
       const urgentBtn = isUrgent ? 'active' : '';
       const ideaTag = t.fromIdea ? `<span class="idea-tag" title="Из проекта">${esc(t.ideaEmoji || '📁')}</span>` : '';
-      tasksHTML += `<li class="task-item ${t.done ? 'done-row' : ''} ${hasDeadline ? 'deadline-row' : ''} ${urgentCls}"
-        data-idx="${ti}" data-flip-id="mt-${d}-${flipKey(t.text)}">
-        <span class="task-drag" title="Перетащить">⋮⋮</span>
+      const realIdx = t.fromIdea ? -1 : dd.tasks.findIndex(x => x.text === t.text);
+      const dragAttrs = realIdx >= 0
+        ? ` draggable="true" data-real-idx="${realIdx}" ondragstart="monthDragStart(event,${d},${realIdx})" ondragover="monthDragOver(event)" ondrop="monthDrop(event,${d},${realIdx})" ondragend="monthDragEnd(event)"`
+        : '';
+      const dragHandle = realIdx >= 0
+        ? `<span class="task-drag" title="Перетащить">⋮⋮</span>`
+        : '';
+      tasksHTML += `<li class="task-item ${t.done ? 'done-row' : ''} ${hasDeadline ? 'deadline-row' : ''} ${urgentCls}"${dragAttrs}
+        data-flip-id="mt-${d}-${flipKey(t.text)}">
+        ${dragHandle}
         <div class="task-cb ${t.done ? 'checked' : ''}" onclick="toggleMonthTask(${d},${ti})"></div>
         <span class="task-name ${t.done ? 'struck' : ''}">${ideaTag}${esc(t.text)}</span>
         ${dlBadge}
@@ -116,7 +126,6 @@ function buildMonthDetail() {
     if (uiState.addingTask[addKey]) {
       addRow = `<div class="add-row">
         <input class="add-input" id="mTaskIn-${d}" placeholder="Новая задача..." autofocus>
-        <input class="add-input deadline-input" id="mDlIn-${d}" type="date" title="Дедлайн (необязательно)">
         <button class="btn-primary" onclick="confirmMonthTask(${d})">+</button>
         <button class="btn-secondary" onclick="cancelMonthTask(${d})">✕</button>
       </div>`;
@@ -236,7 +245,7 @@ function confirmMonthTask(d) {
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
   const task = { text, done: false };
-  if (dlInp && dlInp.value) task.deadline = dlInp.value;
+  
   const {y, m} = viewData;
   const dd = getDayData(y, m, d);
   dd.tasks.push(task);
@@ -254,7 +263,8 @@ function monthDragStart(e, day, idx) {
   _monthDragDay = day;
   _monthDragIdx = idx;
   e.dataTransfer.effectAllowed = 'move';
-  e.target.style.opacity = '0.4';
+  const row = e.target.closest('.task-item');
+  if (row) row.style.opacity = '0.4';
 }
 
 function monthDragOver(e) {
@@ -268,7 +278,8 @@ function monthDrop(e, day, targetIdx) {
   const { y, m } = viewData;
   const dd = getDayData(y, m, day);
   const [item] = dd.tasks.splice(_monthDragIdx, 1);
-  dd.tasks.splice(targetIdx, 0, item);
+  const insertAt = _monthDragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+  dd.tasks.splice(insertAt, 0, item);
   saveDayData(y, m, day, dd);
   _monthDragDay = null;
   _monthDragIdx = null;
@@ -278,7 +289,42 @@ function monthDrop(e, day, targetIdx) {
 function monthDragEnd(e) {
   _monthDragDay = null;
   _monthDragIdx = null;
-  e.target.style.opacity = '';
+  const row = e.target.closest('.task-item');
+  if (row) row.style.opacity = '';
+}
+
+// ==================== GOAL DRAG & DROP ====================
+let _goalDragIdx = null;
+
+function goalDragStart(e, idx) {
+  _goalDragIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  const row = e.target.closest('.goal-item');
+  if (row) row.style.opacity = '0.4';
+}
+
+function goalDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function goalDrop(e, targetIdx) {
+  e.preventDefault();
+  if (_goalDragIdx === null || _goalDragIdx === targetIdx) return;
+  const { y, m } = viewData;
+  const md = getMonthData(y, m);
+  const [item] = md.goals.splice(_goalDragIdx, 1);
+  const insertAt = _goalDragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+  md.goals.splice(insertAt, 0, item);
+  saveMonthData(y, m, md);
+  _goalDragIdx = null;
+  render();
+}
+
+function goalDragEnd(e) {
+  _goalDragIdx = null;
+  const row = e.target.closest('.goal-item');
+  if (row) row.style.opacity = '';
 }
 
 // ==================== GOALS ====================

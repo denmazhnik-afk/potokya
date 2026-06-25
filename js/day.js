@@ -14,7 +14,7 @@ function buildDayPage() {
   allTasks.forEach((t, i) => {
     const hasDeadline = t.deadline && !t.done;
     const isUrgent = t.urgent && !t.done;
-    const dlBadge = t.deadline ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${t.deadline}</span>` : '';
+    const dlBadge = t.deadline ? `<span class="task-deadline-badge ${t.done ? 'done' : ''}">${formatDateDisplay(t.deadline)}</span>` : '';
     const urgentCls = isUrgent ? 'urgent-row' : '';
     const urgentBtn = isUrgent ? 'active' : '';
     const ideaTag = t.fromIdea ? `<span class="idea-tag" title="Из проекта">${esc(t.ideaEmoji || '📁')}</span>` : '';
