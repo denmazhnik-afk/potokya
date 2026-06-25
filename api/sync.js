@@ -4,24 +4,8 @@ const TABLE = 'app_state';
 const ROW_KEY = 'planner_data';
 
 export const config = {
-  api: { bodyParser: false },
+  api: { bodyParser: true },
 };
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', () => {
-      try {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        resolve(JSON.parse(raw));
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -52,8 +36,7 @@ export default async function handler(req, res) {
 
     // POST — сохранение данных
     if (req.method === 'POST') {
-      const body = await readBody(req);
-      const { data } = body;
+      const { data } = req.body;
 
       const url = `${SUPABASE_URL}/rest/v1/${TABLE}`;
       const r = await fetch(url, {
