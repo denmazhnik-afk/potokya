@@ -1,7 +1,17 @@
-// ==================== SYNC (via Vercel proxy) ====================
-const PROXY_URL = '/api/sync';
+// ==================== YANDEX OAUTH & SYNC ====================
+const YANDEX_CLIENT_ID = '7d3c9f6781254e18b5dd42ee9bf9dc46'; 
+
 let isSyncing = false;
 let lastSync = 0;
+let yandexToken = localStorage.getItem('yandexToken') || null;
+
+// Перехватываем токен из URL (Яндекс возвращает его после логина)
+if (window.location.hash.includes('access_token=')) {
+  const params = new URLSearchParams(window.location.hash.substring(1));
+  yandexToken = params.get('access_token');
+  localStorage.setItem('yandexToken', yandexToken);
+  window.location.hash = ''; // Очищаем адресную строку для красоты
+}
 
 function showSyncStatus(text, type = 'syncing') {
   const status = document.getElementById('syncStatus');
@@ -9,52 +19,71 @@ function showSyncStatus(text, type = 'syncing') {
   if (status && textEl) {
     status.className = 'sync-status show ' + type;
     textEl.textContent = text;
-    setTimeout(() => {
-      status.classList.remove('show');
-    }, 2000);
+    setTimeout(() => { status.classList.remove('show'); }, 2000);
   }
 }
 
 async function syncToServer() {
-  if (isSyncing) return;
+  if (isSyncing || !yandexToken) return;
   isSyncing = true;
   showSyncStatus('Синхронизация...');
 
   try {
-    const r = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: localStore }),
+    // 1. Просим у Яндекса ссылку для загрузки (с перезаписью файла)
+    const urlRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/potok-data.json&overwrite=true', {
+      headers: { 'Authorization': 'OAuth ' + yandexToken }
     });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
-      throw new Error(err.error || 'HTTP ' + r.status);
-    }
+    const urlData = await urlRes.json();
+    
+    if (urlRes.status === 401) throw new Error('Token expired');
+    if (!urlData.href) throw new Error('Не удалось получить ссылку');
+
+    // 2. Заливаем сам файл по выданной ссылке
+    await fetch(urlData.href, {
+      method: 'PUT',
+      body: JSON.stringify(localStore)
+    });
+
     lastSync = Date.now();
     showSyncStatus('Синхронизировано', 'success');
   } catch (err) {
-    console.error('Sync error:', err);
+    console.error('Yandex Sync error:', err);
     showSyncStatus('Ошибка синхронизации', 'error');
+    if (err.message === 'Token expired') logout();
   } finally {
     isSyncing = false;
   }
 }
 
 async function loadFromServer() {
+  if (!yandexToken) return;
   try {
-    const r = await fetch(PROXY_URL);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const json = await r.json();
-    if (json && json.data) {
-      localStore = json.data;
-      localStorage.setItem('plannerV2', JSON.stringify(localStore));
-      showSyncStatus('Данные загружены', 'success');
+    // 1. Просим у Яндекса ссылку на скачивание
+    const urlRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/potok-data.json', {
+      headers: { 'Authorization': 'OAuth ' + yandexToken }
+    });
+    const urlData = await urlRes.json();
+
+    // 2. Если файл есть, скачиваем его
+    if (urlData.href) {
+      const dataRes = await fetch(urlData.href);
+      const downloadedStore = await dataRes.json();
+      if (downloadedStore) {
+        localStore = downloadedStore;
+        localStorage.setItem('plannerV2', JSON.stringify(localStore));
+        showSyncStatus('Данные загружены', 'success');
+      }
     }
   } catch (err) {
-    console.log('Server sync unavailable, using local data');
+    console.log('Файла на диске пока нет или ошибка, используем локальные данные');
   }
 }
 
+function logout() {
+  localStorage.removeItem('yandexToken');
+  yandexToken = null;
+  location.reload(); // Перезагружаем страницу, чтобы показать окно входа
+}
 // ==================== STATE ====================
 let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
 

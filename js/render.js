@@ -42,10 +42,32 @@ function render() {
 }
 
 function buildHTML() {
+  // === ЭКРАН ВХОДА ===
+  if (!yandexToken) {
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;">
+        <div style="font-size:64px;margin-bottom:16px;">✦</div>
+        <h1 style="margin-bottom:12px;font-size:32px;">Поток</h1>
+        <p style="color:var(--text-tertiary);margin-bottom:40px;line-height:1.5;max-width:300px;">
+          Ваши задачи, цели и финансы синхронизируются через ваш личный Яндекс Диск. Никто другой не имеет к ним доступа.
+        </p>
+        <a href="https://oauth.yandex.ru/authorize?response_type=token&client_id=${YANDEX_CLIENT_ID}" 
+           class="btn-primary" 
+           style="text-decoration:none;padding:16px 32px;font-size:16px;border-radius:12px;">
+           Войти через Яндекс
+        </a>
+      </div>
+    `;
+  }
+
+  // === ОСНОВНОЕ ПРИЛОЖЕНИЕ ===
   const headerHTML = `
     <div class="dash-header">
       <div class="dash-title">✦ Поток</div>
-      <div class="dash-clock" id="clock">${buildClock()}</div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="dash-clock" id="clock">${buildClock()}</div>
+        <button class="ibtn" onclick="logout()" title="Выйти из аккаунта" style="font-size:16px;opacity:0.5;">🚪</button>
+      </div>
     </div>`;
 
   if (view === 'home') return headerHTML + buildHome();
@@ -198,6 +220,19 @@ function navTo(section) {
 }
 
 function updateNav() {
+  // Прячем меню, если нет токена
+  const sidebar = document.getElementById('sidebar');
+  const tabbar = document.getElementById('tabbar');
+  
+  if (!yandexToken) {
+    if (sidebar) sidebar.style.display = 'none';
+    if (tabbar) tabbar.style.display = 'none';
+    return;
+  } else {
+    if (sidebar) sidebar.style.display = 'flex';
+    if (tabbar) tabbar.style.display = 'flex';
+  }
+
   const section = view === 'home' ? 'home'
     : (view === 'ideas' || view === 'idea-detail') ? 'ideas'
     : (view === 'plan' || view === 'month-detail') ? 'plan'
