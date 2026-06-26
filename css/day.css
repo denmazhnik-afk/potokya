@@ -1048,11 +1048,13 @@
 /* ====== ФИКС КНОПОК ЗАДАЧ НА МОБИЛЬНЫХ ====== */
 @media (max-width: 768px) {
   .task-item {
-    align-items: flex-start !important; /* Кнопки остаются сверху, если текст длинный */
+    align-items: flex-start !important; /* Кнопки остаются сверху, если текст длинный */ 
+    gap: 8px !important;
   }
   
   .task-name {
-    min-width: 0 !important; /* Разрешает тексту переноситься на новую строку */
+    min-width: 150px !important; /* Разрешает тексту переноситься на новую строку */
+    flex: 1 1 100% !important;
     word-wrap: break-word !important;
   }
 
