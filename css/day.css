@@ -1050,7 +1050,9 @@
   .task-item {
     flex-wrap: wrap !important;
     align-items: flex-start !important;
-    padding-bottom: 12px !important; /* Чуть больше места снизу для кнопок */
+    padding-bottom: 8px !important; /* Чуть уменьшили отступ от самого нижнего края */
+    row-gap: 0px !important;        /* ✦ МАГИЯ: Убиваем огромный межстрочный интервал */
+    column-gap: 12px !important;    /* Оставляем стандартный отступ по горизонтали */
   }
 
   /* --- 1 СТРОКА: Чекбокс, текст и крестик --- */
