@@ -4,6 +4,7 @@ const MY_YANDEX_TOKEN = 'y0__wgBEKCXp6EBGNuWAyDkg-GIGDCjiKurCJ2xVcxxAYXvDY9giFM9
 let isSyncing = false;
 let lastSync = 0;
 let hasLocalChanges = false;
+let syncTimeout = null;
 
 function showSyncStatus(text, type = 'syncing') {
   const status = document.getElementById('syncStatus');
@@ -18,7 +19,10 @@ function showSyncStatus(text, type = 'syncing') {
 async function syncToServer() {
   if (isSyncing || !MY_YANDEX_TOKEN || !hasLocalChanges) return;
   isSyncing = true;
+  hasLocalChanges = false;
   showSyncStatus('Синхронизация...');
+
+  const dataToUpload = JSON.stringify(localStore);
 
   try {
     // Получаем ссылку на загрузку в корень твоего Диска в файл potok-data.json
@@ -32,7 +36,7 @@ async function syncToServer() {
     // Загружаем данные
     await fetch(urlData.href, {
       method: 'PUT',
-      body: JSON.stringify(localStore)
+      body: dataToUpload
     });
 
     lastSync = Date.now();
@@ -40,9 +44,13 @@ async function syncToServer() {
     showSyncStatus('Сохранено в облако', 'success');
   } catch (err) {
     console.error('Yandex Sync error:', err);
+    hasLocalChanges = true;
     showSyncStatus('Ошибка сохранения', 'error');
   } finally {
     isSyncing = false;
+    if (hasLocalChanges) {
+      setTimeout(() => syncToServer(), 1000);
+    }
   }
 }
 
@@ -63,6 +71,12 @@ async function loadFromServer() {
       
       // Проверяем, что сервер вернул реальные данные, а не ошибку
       if (downloadedStore && !downloadedStore.error) {
+
+	if (hasLocalChanges) {
+          console.log('Скачивание отменено: локальные данные новее');
+          return;
+        }
+
         localStore = downloadedStore;
         localStorage.setItem('plannerV2', JSON.stringify(localStore));
         hasLocalChanges = false;
@@ -81,9 +95,10 @@ let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
   hasLocalChanges = true;
-  if (Date.now() - lastSync > 2000) {
-    setTimeout(() => syncToServer(), 500);
-  }
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    if (!isSyncing) syncToServer();
+  }, 1500);
 }
 
 // ==================== PERIODIC SYNC ====================
