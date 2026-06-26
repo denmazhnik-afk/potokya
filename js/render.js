@@ -146,6 +146,7 @@ function startClock() {
 function goHome() {
   view = 'home'; viewData = {};
   resetUI(); render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function openDay() {
