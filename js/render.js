@@ -475,17 +475,14 @@ function bindEvents() {
 // ==================== INIT ====================
 async function init() {
   console.log('🚀 Initializing...');
+  
+  // 1. СНАЧАЛА ЖДЕМ СКАЧИВАНИЯ БАЗЫ
+  await loadFromServer(); 
+  
+  // 2. И ТОЛЬКО ПОТОМ запускаем перенос дат, синхронизацию и отрисовку
   doRollover();
   initScrollTop();
   initTouchDrag();
-  render();
   startPeriodicSync();
-  await loadFromServer();
   render();
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
 }

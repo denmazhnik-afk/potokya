@@ -3,6 +3,7 @@ const MY_YANDEX_TOKEN = 'y0__wgBEKCXp6EBGNuWAyDkg-GIGDCjiKurCJ2xVcxxAYXvDY9giFM9
 
 let isSyncing = false;
 let lastSync = 0;
+let hasLocalChanges = false;
 
 function showSyncStatus(text, type = 'syncing') {
   const status = document.getElementById('syncStatus');
@@ -15,7 +16,7 @@ function showSyncStatus(text, type = 'syncing') {
 }
 
 async function syncToServer() {
-  if (isSyncing || !MY_YANDEX_TOKEN) return;
+  if (isSyncing || !MY_YANDEX_TOKEN || !hasLocalChanges) return;
   isSyncing = true;
   showSyncStatus('Синхронизация...');
 
@@ -35,6 +36,7 @@ async function syncToServer() {
     });
 
     lastSync = Date.now();
+    hasLocalChanges = false;
     showSyncStatus('Сохранено в облако', 'success');
   } catch (err) {
     console.error('Yandex Sync error:', err);
@@ -63,6 +65,7 @@ async function loadFromServer() {
       if (downloadedStore && !downloadedStore.error) {
         localStore = downloadedStore;
         localStorage.setItem('plannerV2', JSON.stringify(localStore));
+        hasLocalChanges = false;
         showSyncStatus('Синхронизировано', 'success');
       } else {
         console.error('Ошибка от прокси-сервера:', downloadedStore.error);
@@ -77,6 +80,7 @@ let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
 
 function save() {
   localStorage.setItem('plannerV2', JSON.stringify(localStore));
+  hasLocalChanges = true;
   if (Date.now() - lastSync > 2000) {
     setTimeout(() => syncToServer(), 500);
   }
@@ -85,7 +89,7 @@ function save() {
 // ==================== PERIODIC SYNC ====================
 function startPeriodicSync() {
   setInterval(() => {
-    if (!isSyncing) syncToServer();
+    if (!isSyncing && hasLocalChanges) syncToServer(); 
   }, 30000);
 
   document.addEventListener('visibilitychange', async () => {
