@@ -53,19 +53,23 @@ async function loadFromServer() {
     const urlData = await urlRes.json();
 
     if (urlData.href) {
-      // ✦ МАГИЯ ЗДЕСЬ: Используем другой, более надежный прокси-мост (AllOrigins)
-      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(urlData.href);
+      // ✦ МАГИЯ: Обращаемся к НАШЕМУ собственному серверу на Vercel
+      const proxyUrl = '/api/sync?url=' + encodeURIComponent(urlData.href);
       const dataRes = await fetch(proxyUrl);
       
       const downloadedStore = await dataRes.json();
-      if (downloadedStore) {
+      
+      // Проверяем, что сервер вернул реальные данные, а не ошибку
+      if (downloadedStore && !downloadedStore.error) {
         localStore = downloadedStore;
         localStorage.setItem('plannerV2', JSON.stringify(localStore));
         showSyncStatus('Синхронизировано', 'success');
+      } else {
+        console.error('Ошибка от прокси-сервера:', downloadedStore.error);
       }
     }
   } catch (err) {
-    console.log('Файла на Диске еще нет, используем локальный кэш');
+    console.error('Критическая ошибка загрузки:', err);
   }
 }
 // ==================== STATE ====================
