@@ -475,7 +475,7 @@ function bindEvents() {
 // ==================== INIT ====================
 async function init() {
   console.log('🚀 Initializing...');
-  
+  render();
   // 1. СНАЧАЛА ЖДЕМ СКАЧИВАНИЯ БАЗЫ
   await loadFromServer(); 
   
