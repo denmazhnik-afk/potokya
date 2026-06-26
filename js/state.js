@@ -57,7 +57,7 @@ async function loadFromServer() {
       const downloadedStore = await dataRes.json();
       if (downloadedStore) {
         localStore = downloadedStore;
-        localStorage.setItem('plannerV2', JSON.stringify(localStore));[cite: 3]
+        localStorage.setItem('plannerV2', JSON.stringify(localStore));
         showSyncStatus('Синхронизировано', 'success');
       }
     }
