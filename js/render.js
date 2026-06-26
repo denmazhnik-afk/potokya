@@ -461,6 +461,14 @@ function bindEvents() {
       if (id) addIdeaTask(id);
     }
   });
+
+  const ideaGoalInp = document.getElementById('ideaGoalInp');
+  if (ideaGoalInp) ideaGoalInp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const id = viewData.id;
+      if (id) addIdeaGoal(id);
+    }
+  });
 }
 
 // ==================== INIT ====================

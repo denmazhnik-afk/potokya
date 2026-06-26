@@ -346,8 +346,22 @@ function confirmAddGoal() {
 function toggleGoal(i) {
   const {y, m} = viewData;
   const md = getMonthData(y, m);
-  md.goals[i].done = !md.goals[i].done;
+  const goal = md.goals[i];
+  goal.done = !goal.done;
   saveMonthData(y, m, md);
+
+  // Обратная синхронизация с проектом
+  if (goal.ideaGoalId && goal.ideaId) {
+    const ideas = getIdeas();
+    const idea = ideas.find(p => p.id === goal.ideaId);
+    if (idea && idea.goals) {
+      const pGoal = idea.goals.find(g => g.id === goal.ideaGoalId);
+      if (pGoal) {
+        pGoal.done = goal.done;
+        saveIdeas(ideas);
+      }
+    }
+  }
   render();
 }
 
@@ -369,6 +383,21 @@ function saveGoalEdit(i) {
 function deleteGoal(i) {
   const {y, m} = viewData;
   const md = getMonthData(y, m);
+  const goal = md.goals[i];
+
+  // Удаляем цель и из проекта тоже
+  if (goal.ideaGoalId && goal.ideaId) {
+    const ideas = getIdeas();
+    const idea = ideas.find(p => p.id === goal.ideaId);
+    if (idea && idea.goals) {
+      const gIdx = idea.goals.findIndex(g => g.id === goal.ideaGoalId);
+      if (gIdx !== -1) {
+        idea.goals.splice(gIdx, 1);
+        saveIdeas(ideas);
+      }
+    }
+  }
+
   md.goals.splice(i, 1);
   saveMonthData(y, m, md);
   render();

@@ -100,7 +100,40 @@ function buildIdeaDetail() {
       `;
     }
   }
+  let goalsHTML = '';
+  const projectGoals = idea.goals || [];
+  projectGoals.forEach(g => {
+    let mText = '';
+    if (g.month) {
+      const [gy, gm] = g.month.split('-').map(Number);
+      mText = `<span class="badge badge-blue" style="margin-left:8px;font-size:10px">${MONTHS_SHORT[gm]} ${gy}</span>`;
+    }
+    goalsHTML += `
+      <div class="task-item ${g.done ? 'done-row' : ''}" style="margin-bottom:6px">
+        <div class="task-cb ${g.done ? 'checked' : ''}" onclick="toggleIdeaGoal('${esc(idea.id)}', '${g.id}')"></div>
+        <span class="task-name ${g.done ? 'struck' : ''}">${esc(g.text)} ${mText}</span>
+        <button class="task-del" style="opacity:1" onclick="deleteIdeaGoal('${esc(idea.id)}', '${g.id}')">×</button>
+      </div>
+    `;
+  });
+  if (!goalsHTML) goalsHTML = '<div class="empty-state" style="padding:6px 0">Нет глобальных целей</div>';
 
+  const monthOptions = YEARS.map(y => MONTHS_RU.map((mName, mIdx) => `<option value="${y}-${mIdx}">${mName} ${y}</option>`).join('')).join('');
+
+  const goalsSection = `
+    <div class="section-card">
+      <div class="section-eyebrow">🎯 Цели проекта</div>
+      <div style="margin-bottom:12px">${goalsHTML}</div>
+      <div class="add-row">
+        <input class="add-input" id="ideaGoalInp" placeholder="Новая цель...">
+        <select class="add-input" id="ideaGoalMonth" style="flex:0 0 130px; padding:0 8px;">
+          <option value="">Без месяца</option>
+          ${monthOptions}
+        </select>
+        <button class="btn-primary" onclick="addIdeaGoal('${esc(idea.id)}')">+</button>
+      </div>
+    </div>
+  `;	
   const notesHTML = buildNoteBlock('ideaNotes-' + idea.id, 'Заметки', idea.notes || '');
 
   return `
@@ -117,6 +150,8 @@ function buildIdeaDetail() {
       </div>
       ${emojiPickerHTML}
     </div>
+
+    ${goalsSection}
 
     <div class="section-card">
       <div class="section-eyebrow">📋 Задачи</div>
@@ -344,4 +379,81 @@ function ideaDrop(e, id, targetIdx) {
 function ideaDragEnd(e) {
   _ideaDragIdx = null;
   _ideaDragId = null;
+}
+// ==================== PROJECT GOALS LOGIC ====================
+function addIdeaGoal(ideaId) {
+  const inp = document.getElementById('ideaGoalInp');
+  const monthSel = document.getElementById('ideaGoalMonth');
+  const text = inp ? inp.value.trim() : '';
+  if (!text) return;
+
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (!idea) return;
+  if (!idea.goals) idea.goals = [];
+
+  const monthVal = monthSel ? monthSel.value : '';
+  const goalId = 'ig_' + Date.now();
+
+  idea.goals.push({ id: goalId, text, done: false, month: monthVal });
+  saveIdeas(ideas);
+
+  // Добавляем цель в выбранный месяц
+  if (monthVal) {
+    const [y, m] = monthVal.split('-').map(Number);
+    const md = getMonthData(y, m);
+    md.goals.push({
+      text: `[${idea.emoji || '📁'} ${idea.name}] ${text}`, // Добавляем тег проекта
+      done: false,
+      ideaGoalId: goalId,
+      ideaId: ideaId
+    });
+    saveMonthData(y, m, md);
+  }
+  render();
+}
+
+function toggleIdeaGoal(ideaId, goalId) {
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (!idea || !idea.goals) return;
+  const goal = idea.goals.find(g => g.id === goalId);
+  if (!goal) return;
+
+  goal.done = !goal.done;
+  saveIdeas(ideas);
+
+  // Синхронизируем статус с месяцем
+  if (goal.month) {
+    const [y, m] = goal.month.split('-').map(Number);
+    const md = getMonthData(y, m);
+    const mg = md.goals.find(g => g.ideaGoalId === goalId);
+    if (mg) {
+      mg.done = goal.done;
+      saveMonthData(y, m, md);
+    }
+  }
+  render();
+}
+
+function deleteIdeaGoal(ideaId, goalId) {
+  const ideas = getIdeas();
+  const idea = ideas.find(p => p.id === ideaId);
+  if (!idea || !idea.goals) return;
+  
+  const idx = idea.goals.findIndex(g => g.id === goalId);
+  if (idx === -1) return;
+  
+  const goal = idea.goals[idx];
+  idea.goals.splice(idx, 1);
+  saveIdeas(ideas);
+
+  // Удаляем из месяца
+  if (goal.month) {
+    const [y, m] = goal.month.split('-').map(Number);
+    const md = getMonthData(y, m);
+    md.goals = md.goals.filter(g => g.ideaGoalId !== goalId);
+    saveMonthData(y, m, md);
+  }
+  render();
 }
