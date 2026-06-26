@@ -53,7 +53,10 @@ async function loadFromServer() {
     const urlData = await urlRes.json();
 
     if (urlData.href) {
-      const dataRes = await fetch(urlData.href);
+      // ✦ МАГИЯ ЗДЕСЬ: Оборачиваем ссылку Яндекса в публичный CORS-прокси
+      const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(urlData.href);
+      const dataRes = await fetch(proxyUrl);
+      
       const downloadedStore = await dataRes.json();
       if (downloadedStore) {
         localStore = downloadedStore;
