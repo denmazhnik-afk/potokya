@@ -1,17 +1,8 @@
-// ==================== YANDEX OAUTH & SYNC ====================
-const YANDEX_CLIENT_ID = '7d3c9f6781254e18b5dd42ee9bf9dc46'; 
+// ==================== LIKHOY PERSONAL YANDEX SYNC ====================
+const MY_YANDEX_TOKEN = 'y0__wgBEKCXp6EBGNuWAyDkg-GIGDCjiKurCJ2xVcxxAYXvDY9giFM973UIH_f5'; // <--- Твой токен из Полигона
 
 let isSyncing = false;
 let lastSync = 0;
-let yandexToken = localStorage.getItem('yandexToken') || null;
-
-// Перехватываем токен из URL (Яндекс возвращает его после логина)
-if (window.location.hash.includes('access_token=')) {
-  const params = new URLSearchParams(window.location.hash.substring(1));
-  yandexToken = params.get('access_token');
-  localStorage.setItem('yandexToken', yandexToken);
-  window.location.hash = ''; // Очищаем адресную строку для красоты
-}
 
 function showSyncStatus(text, type = 'syncing') {
   const status = document.getElementById('syncStatus');
@@ -24,65 +15,55 @@ function showSyncStatus(text, type = 'syncing') {
 }
 
 async function syncToServer() {
-  if (isSyncing || !yandexToken) return;
+  if (isSyncing || !MY_YANDEX_TOKEN) return;
   isSyncing = true;
   showSyncStatus('Синхронизация...');
 
   try {
-    // 1. Просим у Яндекса ссылку для загрузки (с перезаписью файла)
-    const urlRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/potok-data.json&overwrite=true', {
-      headers: { 'Authorization': 'OAuth ' + yandexToken }
+    // Получаем ссылку на загрузку в корень твоего Диска в файл potok-data.json
+    const urlRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=disk:/potok-data.json&overwrite=true', {
+      headers: { 'Authorization': 'OAuth ' + MY_YANDEX_TOKEN }
     });
     const urlData = await urlRes.json();
     
-    if (urlRes.status === 401) throw new Error('Token expired');
-    if (!urlData.href) throw new Error('Не удалось получить ссылку');
+    if (!urlData.href) throw new Error('Не удалось получить ссылку от Яндекса');
 
-    // 2. Заливаем сам файл по выданной ссылке
+    // Загружаем данные
     await fetch(urlData.href, {
       method: 'PUT',
       body: JSON.stringify(localStore)
     });
 
     lastSync = Date.now();
-    showSyncStatus('Синхронизировано', 'success');
+    showSyncStatus('Сохранено в облако', 'success');
   } catch (err) {
     console.error('Yandex Sync error:', err);
-    showSyncStatus('Ошибка синхронизации', 'error');
-    if (err.message === 'Token expired') logout();
+    showSyncStatus('Ошибка сохранения', 'error');
   } finally {
     isSyncing = false;
   }
 }
 
 async function loadFromServer() {
-  if (!yandexToken) return;
+  if (!MY_YANDEX_TOKEN) return;
   try {
-    // 1. Просим у Яндекса ссылку на скачивание
-    const urlRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/potok-data.json', {
-      headers: { 'Authorization': 'OAuth ' + yandexToken }
+    const urlRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=disk:/potok-data.json', {
+      headers: { 'Authorization': 'OAuth ' + MY_YANDEX_TOKEN }
     });
     const urlData = await urlRes.json();
 
-    // 2. Если файл есть, скачиваем его
     if (urlData.href) {
       const dataRes = await fetch(urlData.href);
       const downloadedStore = await dataRes.json();
       if (downloadedStore) {
         localStore = downloadedStore;
-        localStorage.setItem('plannerV2', JSON.stringify(localStore));
-        showSyncStatus('Данные загружены', 'success');
+        localStorage.setItem('plannerV2', JSON.stringify(localStore));[cite: 3]
+        showSyncStatus('Синхронизировано', 'success');
       }
     }
   } catch (err) {
-    console.log('Файла на диске пока нет или ошибка, используем локальные данные');
+    console.log('Файла на Диске еще нет, используем локальный кэш');
   }
-}
-
-function logout() {
-  localStorage.removeItem('yandexToken');
-  yandexToken = null;
-  location.reload(); // Перезагружаем страницу, чтобы показать окно входа
 }
 // ==================== STATE ====================
 let localStore = JSON.parse(localStorage.getItem('plannerV2') || '{}');
