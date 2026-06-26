@@ -1084,18 +1084,18 @@
   .task-deadline-badge {
     order: 6;
     margin-left: 36px !important; /* Сдвигаем вправо, чтобы выровнять ровно под текстом */
-    margin-top: 10px !important;
+    margin-top: 2px !important;
   }
   
   .task-urgent-btn {
     order: 7;
-    margin-top: 10px !important;
+    margin-top: 2px !important;
     margin-left: 8px !important;
   }
   
   .ibtn[title="Дата"] { /* Кнопка календарика в Проектах */
     order: 8;
-    margin-top: 10px !important;
+    margin-top: 2px !important;
     margin-left: 8px !important;
   }
 
