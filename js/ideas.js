@@ -285,7 +285,7 @@ function toggleIdeaTask(id, idx) {
   
   // Выдаем +10 XP, если задача только что была выполнена
   if (!wasDone) {
-    addXP(10, 'Задача проекта', `idea-task-${id}-${idx}-${Date.now()}`);
+    addXP(10, 'Задача проекта', `idea-task-${id}-${idx}`);
   }
   
   saveIdeas(ideas);
@@ -434,7 +434,7 @@ function toggleIdeaGoal(ideaId, goalId) {
 
   // Выдаем +15 XP за достижение цели проекта
   if (!wasDone) {
-    addXP(15, 'Цель проекта', `idea-goal-${ideaId}-${goalId}-${Date.now()}`);
+    addXP(15, 'Цель проекта', `idea-goal-${ideaId}-${goalId}`);
   }
 
   saveIdeas(ideas);

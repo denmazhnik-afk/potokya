@@ -354,7 +354,7 @@ function toggleGoal(i) {
 
   // Выдаем +15 XP за достижение цели месяца
   if (!wasDone) {
-    addXP(15, 'Цель месяца', `month-goal-${y}-${m}-${i}-${Date.now()}`);
+    addXP(15, 'Цель месяца', `month-goal-${y}-${m}-${i}`);
   }
 
   saveMonthData(y, m, md);
